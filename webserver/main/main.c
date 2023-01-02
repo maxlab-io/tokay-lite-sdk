@@ -1,7 +1,8 @@
 #include "esp_camera.h"
 #include "sensor.h"
-#include "esp_log.h"
 
+#include "esp_log.h"
+#include "driver/temperature_sensor.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
 
@@ -102,6 +103,8 @@ static const httpd_uri_t handler_get_sensors = {
 static httpd_handle_t http_server_handle;
 static httpd_handle_t streaming_server_handle;
 
+static temperature_sensor_handle_t temp_sensor;
+
 static void start_httpd(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -133,6 +136,10 @@ void app_main(void)
 {
     ai_camera_init();
     ai_camera_start(PIXFORMAT_JPEG); // TODO: manage FPS?
+
+    temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
+    ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor_config, &temp_sensor));
+
     start_httpd();
 }
 
@@ -392,9 +399,14 @@ static esp_err_t http_handler_get_sensors(httpd_req_t *req)
     if (NULL == p_root) {
         goto fail;
     }
+    float tsens_value = 0;
+    ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &tsens_value));
+
     cJSON_AddNumberToObject(p_root, "light", ai_camera_read_light_sensor());
     cJSON_AddNumberToObject(p_root, "motion", 0); // TODO: figure out how to report motion
-    cJSON_AddNumberToObject(p_root, "ir", ai_camera_get_ir_state()); // TODO: figure out how to report motion
+    cJSON_AddNumberToObject(p_root, "ir", ai_camera_get_ir_state());
+    cJSON_AddNumberToObject(p_root, "temp", tsens_value);
+
     char *p_response = cJSON_Print(p_root);
     if (NULL == p_response) {
         goto fail;
@@ -441,4 +453,3 @@ void system_config_apply(void)
 {
 
 }
-
