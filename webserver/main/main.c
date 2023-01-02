@@ -7,6 +7,7 @@
 #include "cJSON.h"
 
 #include "ai_camera.h"
+#include "config.h"
 
 #define PART_BOUNDARY        "123456789000000000000987654321"
 #define _STREAM_CONTENT_TYPE "multipart/x-mixed-replace;boundary=" PART_BOUNDARY
@@ -25,6 +26,7 @@ typedef enum {
 } http_image_format_t;
 
 typedef enum {
+    SYSTEM_CONFIG_PIR_ENABLED,
     SYSTEM_CONFIG_MAX,
 } system_config_t;
 
@@ -105,6 +107,16 @@ static httpd_handle_t streaming_server_handle;
 
 static temperature_sensor_handle_t temp_sensor;
 
+static config_desc_t system_config_desc[SYSTEM_CONFIG_MAX] = {
+    [SYSTEM_CONFIG_PIR_ENABLED] = { "pir_en", CONFIG_TYPE_INT },
+};
+static config_value_t system_config_values[SYSTEM_CONFIG_MAX];
+static config_ctx_t system_config_ctx = {
+    .num_vars = SYSTEM_CONFIG_MAX,
+    .p_desc = system_config_desc,
+    .p_values = system_config_values,
+};
+
 static void start_httpd(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -134,7 +146,7 @@ static void start_httpd(void)
 
 void app_main(void)
 {
-    ai_camera_init();
+    ai_camera_init(0);
     ai_camera_start(PIXFORMAT_JPEG); // TODO: manage FPS?
 
     temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
@@ -263,15 +275,15 @@ static esp_err_t http_handler_get_settings(httpd_req_t *req)
         goto fail;
     }
     for (int i = 0; i < SYSTEM_CONFIG_MAX; i++) {
-        const char *p_name = system_config_get_name(i);
-        switch (system_config_get_type(i)) {
+        const char *p_name = config_get_name(&system_config_ctx, i);
+        switch (config_get_type(&system_config_ctx, i)) {
         case CONFIG_TYPE_STRING:
             cJSON_AddStringToObject(p_sensor_config, p_name,
-                                                *(const char **)system_config_get_value(i));
+                                    *(const char **)config_get_value(&system_config_ctx, i));
             break;
         case CONFIG_TYPE_INT:
             cJSON_AddNumberToObject(p_sensor_config, p_name,
-                                                *(int *)system_config_get_value(i));
+                                    *(int *)config_get_value(&system_config_ctx, i));
             break;
         default:
             assert(0);
@@ -324,21 +336,24 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
     }
 
     cJSON *p_sensor_config = cJSON_GetObjectItemCaseSensitive(p_settings, "sensor_config");
+    ai_camera_process_settings_json(p_sensor_config);
+
+    cJSON *p_system_config = cJSON_GetObjectItemCaseSensitive(p_settings, "system_config");
     cJSON *p_cfg_val = NULL;
-    cJSON_ArrayForEach(p_cfg_val, p_sensor_config)
+    cJSON_ArrayForEach(p_cfg_val, p_system_config)
     {
-        ai_camera_config_t config = ai_camera_config_get_by_name(p_cfg_val->string);
-        if (AI_CAMERA_CONFIG_MAX == config) {
+        system_config_t config = config_get_by_name(&system_config_ctx, p_cfg_val->string);
+        if (SYSTEM_CONFIG_MAX == config) {
             ESP_LOGE(TAG, "Unknown config variable %s", p_cfg_val->string);
             continue;
         }
-        switch (ai_camera_config_get_type(config)) {
+        switch (config_get_type(&system_config_ctx, config)) {
         case CONFIG_TYPE_STRING:
             if (!cJSON_IsString(p_cfg_val)) {
                 ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
                 continue;
             }
-            ai_camera_config_set_value(config, &p_cfg_val->valuestring);
+            config_set_value(&system_config_ctx, config, &p_cfg_val->valuestring);
             break;
         case CONFIG_TYPE_INT: {
             if (!cJSON_IsNumber(p_cfg_val)) {
@@ -346,7 +361,7 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
                 continue;
             }
             const int valueint = (int)p_cfg_val->valuedouble;
-            ai_camera_config_set_value(config, &valueint);
+            config_set_value(&system_config_ctx, config, &valueint);
             break;
         }
         default:
@@ -355,36 +370,7 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
         }
     }
 
-    cJSON *p_system_config = cJSON_GetObjectItemCaseSensitive(p_settings, "system_config");
-    cJSON_ArrayForEach(p_cfg_val, p_system_config)
-    {
-        system_config_t config = system_config_get_by_name(p_cfg_val->string);
-        if (SYSTEM_CONFIG_MAX == config) {
-            ESP_LOGE(TAG, "Unknown config variable %s", p_cfg_val->string);
-            continue;
-        }
-        switch (system_config_get_type(config)) {
-        case CONFIG_TYPE_STRING:
-            if (!cJSON_IsString(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
-                continue;
-            }
-            system_config_set_value(config, &p_cfg_val->valuestring);
-            break;
-        case CONFIG_TYPE_INT: {
-            if (!cJSON_IsNumber(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected number", p_cfg_val->string);
-                continue;
-            }
-            const int valueint = (int)p_cfg_val->valuedouble;
-            system_config_set_value(config, &valueint);
-            break;
-        }
-        default:
-            assert(0);
-            break;
-        }
-    }
+    cJSON_Delete(p_settings);
 
     ai_camera_config_apply();
     system_config_apply();
@@ -402,7 +388,7 @@ static esp_err_t http_handler_get_sensors(httpd_req_t *req)
     float tsens_value = 0;
     ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &tsens_value));
 
-    cJSON_AddNumberToObject(p_root, "light", ai_camera_read_light_sensor());
+    cJSON_AddNumberToObject(p_root, "light", ai_camera_get_light_level());
     cJSON_AddNumberToObject(p_root, "motion", 0); // TODO: figure out how to report motion
     cJSON_AddNumberToObject(p_root, "ir", ai_camera_get_ir_state());
     cJSON_AddNumberToObject(p_root, "temp", tsens_value);
@@ -424,32 +410,7 @@ fail:
     return ESP_OK;
 }
 
-const char *system_config_get_name(system_config_t config)
-{
-    return "";
-}
-
-const void *system_config_get_value(system_config_t config)
-{
-    return NULL;
-}
-
-void system_config_set_value(system_config_t config, const void *p_value)
-{
-
-}
-
-system_config_t system_config_get_by_name(const char *name)
-{
-    return SYSTEM_CONFIG_MAX;
-}
-
-config_type_t system_config_get_type(system_config_t config)
-{
-    return CONFIG_TYPE_STRING;
-}
-
 void system_config_apply(void)
 {
-
+    // TODO
 }
