@@ -7,6 +7,7 @@
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "driver/temperature_sensor.h"
+#include "driver/adc.h"
 
 #include "ai_camera.h"
 #include "config.h"
@@ -27,6 +28,9 @@
 
 #define I2C_SDA_PIN 13
 #define I2C_SCL_PIN 3
+
+#define BATT_DETECT_ADC_CHANNEL ADC1_CHANNEL_0_GPIO_NUM
+#define BATT_DETECT_ADC_TO_MV(x) (x * 2)
 
 typedef enum {
     HTTP_IMAGE_FORMAT_JPEG,
@@ -125,6 +129,18 @@ static config_ctx_t system_config_ctx = {
     .p_desc = system_config_desc,
     .p_values = system_config_values,
 };
+
+static uint32_t measure_vbat(void)
+{
+    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
+    esp_adc_cal_characteristics_t *adc_chars_11db = calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_DEFAULT, ADC_VREF, adc_chars_11db);
+    ESP_ERROR_CHECK(adc1_config_channel_atten(BATT_DETECT_ADC_CHANNEL, ADC_ATTEN_DB_11));
+    uint32_t ret = VBAT_ADC_TO_MV(esp_adc_cal_raw_to_voltage(adc1_get_raw(BATT_DETECT_ADC_CHANNEL), adc_chars_11db));
+    free(adc_chars_11db);
+    return BATT_DETECT_ADC_TO_MV(ret);
+}
+
 
 static void start_httpd(void)
 {
@@ -422,6 +438,7 @@ static esp_err_t http_handler_get_sensors(httpd_req_t *req)
     cJSON_AddNumberToObject(p_root, "motion", 0); // TODO: figure out how to report motion
     cJSON_AddNumberToObject(p_root, "ir", ai_camera_get_ir_state());
     cJSON_AddNumberToObject(p_root, "temp", tsens_value);
+    cJSON_AddNumberToObject(p_root, "vbat", measure_vbat());
 
     char *p_response = cJSON_Print(p_root);
     if (NULL == p_response) {
