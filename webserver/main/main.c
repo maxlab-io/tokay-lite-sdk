@@ -203,7 +203,6 @@ static uint32_t measure_vbat(void)
     return BATT_DETECT_MV_TO_BATT_MV(ret);
 }
 
-
 static void start_httpd(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
