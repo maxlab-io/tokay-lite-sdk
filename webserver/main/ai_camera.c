@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
 #include "driver/ledc.h"
+#include "driver/gpio.h"
 
 #include "config.h"
 #include "light_sensor.h"

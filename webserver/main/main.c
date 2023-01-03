@@ -2,12 +2,15 @@
 #include "sensor.h"
 
 #include "esp_log.h"
-#include "driver/temperature_sensor.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
+#include "driver/gpio.h"
+#include "driver/i2c.h"
+#include "driver/temperature_sensor.h"
 
 #include "ai_camera.h"
 #include "config.h"
+#include "pir.h"
 
 #define PART_BOUNDARY        "123456789000000000000987654321"
 #define _STREAM_CONTENT_TYPE "multipart/x-mixed-replace;boundary=" PART_BOUNDARY
@@ -18,6 +21,12 @@
 #define SETTINGS_JSON_MAX_SIZE     1024
 
 #define TAG "webserver"
+
+#define I2C_BUS_ID    0
+#define I2C_FREQUENCY 100000
+
+#define I2C_SDA_PIN 13
+#define I2C_SCL_PIN 3
 
 typedef enum {
     HTTP_IMAGE_FORMAT_JPEG,
@@ -144,9 +153,30 @@ static void start_httpd(void)
     ESP_ERROR_CHECK(httpd_register_uri_handler(streaming_server_handle, &handler_stream));
 }
 
+static void pir_motion_callback(void *ctx)
+{
+    // TODO: store events in a list to be reported to the front-end
+}
+
 void app_main(void)
 {
-    ai_camera_init(0);
+    gpio_install_isr_service(0);
+    pir_init(pir_motion_callback, NULL);
+
+    ESP_ERROR_CHECK(i2c_driver_install(I2C_BUS_ID, I2C_MODE_MASTER, 0, 0, 0));
+
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = I2C_SDA_PIN,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_io_num = I2C_SCL_PIN,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = I2C_FREQUENCY,
+    };
+
+    ESP_ERROR_CHECK(i2c_param_config(I2C_BUS_ID, &conf));
+
+    ai_camera_init(I2C_BUS_ID);
     ai_camera_start(PIXFORMAT_JPEG); // TODO: manage FPS?
 
     temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
