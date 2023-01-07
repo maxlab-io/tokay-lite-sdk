@@ -27,33 +27,10 @@
             <div class="tab-content" id="configTabContent">
               <div class="tab-pane fade show active" id="sensor" role="tabpanel" aria-labelledby="sensor-tab">
                 <form class="form-inline row g-3" style="overflow-y:scroll" id="imageSensorConfigForm">
-                  <label>Resolution</label>
-                  <div class="btn-group" role="group">
-                    <input type="radio" class="btn-check" name="btnradio" id="cfgResolution160" autocomplete="off">
-                    <label class="btn btn-outline-primary" for="cfgResolution160">160x120</label>
-
-                    <input type="radio" class="btn-check" name="btnradio" id="cfgResolution320" autocomplete="off">
-                    <label class="btn btn-outline-primary" for="cfgResolution320">320x240</label>
-
-                    <input type="radio" class="btn-check" name="btnradio" id="cfgResolution640" autocomplete="off">
-                    <label class="btn btn-outline-primary" for="cfgResolution640">640x480</label>
-
-                    <input type="radio" class="btn-check" name="btnradio" id="cfgResolution800" autocomplete="off">
-                    <label class="btn btn-outline-primary" for="cfgResolution800">800x600</label>
-
-                    <input type="radio" class="btn-check" name="btnradio" id="cfgResolution1600" autocomplete="off">
-                    <label class="btn btn-outline-primary" for="cfgResolution1600">1600x1200</label>
-                  </div>
-                  <button class="btn btn-primary" id="submitImageSensorConfig" type="submit">Save</button>
                 </form>
               </div>
               <div class="tab-pane fade overflow-auto" id="system" role="tabpanel" aria-labelledby="system-tab">
                 <form id="systemConfigForm">
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="enablePIR">
-                    <label class="form-check-label" for="enablePIR" >Enable PIR motion detection</label>
-                  </div>
-                  <button class="btn btn-primary" id="submitSystemConfig" type="submit">Save</button>
                 </form>
                 </div>
                 <div class="tab-pane fade overflow-auto" id="cnn" role="tabpanel" aria-labelledby="cnn-tab">
@@ -101,46 +78,191 @@
         $('#imageSensorConfigForm').css('height', $('#topUiRow').outerHeight() - 30)
         $('#imageSensorConfigForm').jsonForm({
         schema: {
-            name: {
-            type: 'string',
-            title: 'Name',
-            required: true
+            resolution: {
+                type: 'string',
+                title: 'Resolution',
+                required: true,
+                enum: [
+                    "160", "320", "640", "800", "1600"
+                ]
             },
-            age: {
-            type: 'number',
-            title: 'Age'
+            contrast: {
+                type: 'integer',
+                title: 'Contrast',
+                required: true,
+                minimum: -2,
+                maximum: 2
             },
-            age2: {
-            type: 'number',
-            title: 'Age'
+            brightness: {
+                type: 'integer',
+                title: 'Brigtness',
+                required: true,
+                minimum: -2,
+                maximum: 2
             },
-            age3: {
-            type: 'number',
-            title: 'Age'
+            saturation: {
+                type: 'integer',
+                title: 'Saturation',
+                required: true,
+                minimum: -2,
+                maximum: 2
             },
-            age4: {
-            type: 'number',
-            title: 'Age'
+            sharpness: {
+                type: 'integer',
+                title: 'Sharpness',
+                required: true,
+                minimum: -2,
+                maximum: 2
             },
-            age5: {
-            type: 'number',
-            title: 'Age'
+            denoise: {
+                type: 'boolean',
+                title: 'Denoise',
+                required: true
             },
-            age6: {
-            type: 'number',
-            title: 'Age'
+            gainceiling: {
+                type: 'integer',
+                title: 'Gainceiling',
+                required: true,
+                minimum: 0,
+                maximum: 6
             },
-            age7: {
-            type: 'number',
-            title: 'Age'
+            jpeg_quality: {
+                type: 'integer',
+                title: 'JPEG quality',
+                required: true,
+                minimum: 0,
+                maximum: 64
             },
-            age8: {
-            type: 'number',
-            title: 'Age'
+            colorbar: {
+                type: 'boolean',
+                title: 'Colorbar',
+                required: true
             },
-            age9: {
-            type: 'number',
-            title: 'Age'
+            whitebal: {
+                type: 'boolean',
+                title: 'Enable AWB',
+                required: true
+            },
+            gain_ctrl: {
+                type: 'boolean',
+                title: 'Enable AGC',
+                required: true
+            },
+            exposure_ctrl: {
+                type: 'boolean',
+                title: 'Enable AEC',
+                required: true
+            },
+            hmirror: {
+                type: 'boolean',
+                title: 'Enable horizontal mirroring',
+                required: true
+            },
+            vflip: {
+                type: 'boolean',
+                title: 'Enable vertical flip',
+                required: true
+            },
+            aec2: {
+                type: 'boolean',
+                title: 'Enable AEC2',
+                required: true
+            },
+            awb_gain: {
+                type: 'integer',
+                title: 'AWB Gain',
+                required: true,
+                minimum: 0,
+                maximum: 255
+            },
+            agc_gain: {
+                type: 'integer',
+                title: 'AGC Gain',
+                required: true,
+                minimum: 0,
+                maximum: 255
+            },
+            aec: {
+                type: 'integer',
+                title: 'AEC value',
+                required: true,
+                minimum: 0,
+                maximum: 1200
+            },
+            special_effect: {
+                type: 'integer',
+                title: 'Special effect',
+                required: true,
+                minimum: 0,
+                maximum: 6
+            },
+            wb_mode: {
+                type: 'integer',
+                title: 'White Balance mode',
+                required: true,
+                minimum: 0,
+                maximum: 4
+            },
+            ae_level: {
+                type: 'integer',
+                title: 'AE level',
+                required: true,
+                minimum: -2,
+                maximum: 2
+            },
+            dcw: {
+                type: 'boolean',
+                title: 'DCW',
+                required: true
+            },
+            bpc: {
+                type: 'boolean',
+                title: 'BPC',
+                required: true
+            },
+            wpc: {
+                type: 'boolean',
+                title: 'WPC',
+                required: true
+            },
+            raw_gma: {
+                type: 'boolean',
+                title: 'Raw GMA',
+                required: true
+            },
+            lenc: {
+                type: 'boolean',
+                title: 'Lenc',
+                required: true
+            },
+            xclk_freq: {
+                type: 'integer',
+                title: 'XCLK frequency',
+                required: true,
+                enum: [ 1e6, 2e6, 4e6, 8e6, 16e6, 10e6, 20e6 ]
+            },
+            ir_mode: {
+                type: 'integer',
+                title: 'IR mode',
+                enum: [ 0, 1 ]
+            },
+            ir_light_thresh_high: {
+                type: 'integer',
+                title: 'IR light thresh high',
+                minimum: 0,
+                maximum: 16000
+            },
+            ir_light_thresh_low: {
+                type: 'integer',
+                title: 'IR light thresh low',
+                minimum: 0,
+                maximum: 16000
+            },
+            ir_brightness: {
+                type: 'integer',
+                title: 'IR LEDs brightness',
+                minimum: 0,
+                maximum: 255
             },
         },
         onSubmit: function (errors, values) {
