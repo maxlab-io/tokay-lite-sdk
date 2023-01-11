@@ -9,39 +9,40 @@
     <title>ai-camera</title>
   </head>
   <body>
-    <div class="container-fluid">
+    <div id="rootContainer" class="container-fluid">
        <div class="row"><h2>ai-camera sandbox</h2></div>
-        <div class="row" id="topUiRow" style="height:70%">
+        <div class="row" id="topUiRow">
           <div class="col-4">
             <ul class="nav nav-tabs" id="configTab" role="tablist">
-            <li class="nav-item active" role="presentation">
-                <button class="nav-link" id="sensor-tab" data-bs-toggle="tab" data-bs-target="#sensor" type="sensor" role="tab" aria-controls="sensor" aria-selected="true">Image Sensor</button>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="system-tab" data-bs-toggle="tab" data-bs-target="#system" type="button" role="tab" aria-controls="system" aria-selected="true">System</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system" type="button" role="tab" aria-controls="system" aria-selected="false">System</button>
+                <button class="nav-link" id="sensor-tab" data-bs-toggle="tab" data-bs-target="#sensor" type="sensor" role="tab" aria-controls="sensor" aria-selected="false">Image Sensor</button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="cnn-tab" data-bs-toggle="tab" data-bs-target="#cnn" type="cnn" role="tab" aria-controls="cnn" aria-selected="false">CNN</button>
             </li>
             </ul>
             <div class="tab-content" id="configTabContent">
-              <div class="tab-pane fade show active" id="sensor" role="tabpanel" aria-labelledby="sensor-tab">
-                <form class="form-inline row g-3" style="overflow-y:scroll" id="imageSensorConfigForm">
+              <div class="tab-pane fade show active mt-3" id="system" role="tabpanel" aria-labelledby="system-tab">
+                <form id="systemConfigForm" style="overflow-y:auto" >
+                  TODO
                 </form>
               </div>
-              <div class="tab-pane fade overflow-auto" id="system" role="tabpanel" aria-labelledby="system-tab">
-                <form id="systemConfigForm">
+              <div class="tab-pane fade mt-3" id="sensor" role="tabpanel" aria-labelledby="sensor-tab">
+                <form class="form-inline row g-3" style="overflow-y:auto" id="imageSensorConfigForm">
                 </form>
-                </div>
-                <div class="tab-pane fade overflow-auto" id="cnn" role="tabpanel" aria-labelledby="cnn-tab">
+              </div>
+              <div class="tab-pane fade mt-3" id="cnn" role="tabpanel" aria-labelledby="cnn-tab">
                   TODO
-                </div>
+              </div>
             </div>
           </div>
           <div class="col">
             <div class="row">
                 <img id="viewport" height="600px" src="/image.jpg"
-                    onerror="this.onerror=null, this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='">
+                    onerror="this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='">
             </div>
             <div class="row gap-5" style="margin: 5px">
               <button type="button" id="playStream" class="col btn btn-outline-success">Run stream <span class="bi bi-file-play-fill"></button>
@@ -52,7 +53,7 @@
             </div>
           </div>
         </div>
-        <div class="row">
+        <div id="statsRow" class="row">
           <h4>Stats</h4>
           <div class="row">
             <dt class="col">CPU0, %</dt><dl class="col" id="cpu0Val">10</dl>
@@ -67,7 +68,7 @@
             <dt class="col">Motion</dt><dl class="col" id="motionVal">0</dl>
           </div>
           <div class="row">
-            <dt class="col">IR state</dt><dl class="col" id="irStateVal">Day</dl>
+            <dt class="col">IR state</dt><dl class="col" id="irVal">Day</dl>
             <dt class="col">Battery, mV</dt><dl class="col" id="vbatVal">3851</dl>
             <dt class="col"></dt><dl class="col"></dl>
             <dt class="col"></dt><dl class="col"></dl>
@@ -75,7 +76,55 @@
         </div>
     </div>
     <script type="text/javascript">
-        $('#imageSensorConfigForm').css('height', $('#topUiRow').outerHeight() - 30)
+
+        function handlePlayStream() {
+            $('#viewport').attr('src', '/stream');
+        }
+
+        function handleStopStream() {
+            $('#viewport').attr('src', '/image.jpg');
+        }
+
+        function makeDownload(file_path) {
+            var a = document.createElement('A');
+            a.href = file_path;
+            a.target="blank";
+            a.download = file_path.substr(file_path.lastIndexOf('/') + 1);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function handleGetJPEG() {
+            makeDownload("/image.jpg");
+        }
+
+        function handleGetYUV422() {
+            makeDownload("/image.yuv422");
+        }
+
+        function handleGetRGB565() {
+            makeDownload("/image.rgb565");
+        }
+
+        function updateStats() {
+            let xhr = new XMLHttpRequest();
+            xhr.open("GET", "/sensors");
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.onload = () => {
+                const resp_json = JSON.parse(xhr.responseText);
+                for (let k in resp_json) {
+                    $(`#{k}Value`).html(resp_json[k]);
+                }
+                setTimeout(updateStats, 1000);
+            }
+            xhr.send(null);
+        }
+
+        console.log($(window).height());
+        console.log($('#statsRow').outerHeight());
+        $('#imageSensorConfigForm').css('height', $(window).height()*0.65)
+        $('#statsRow').css('height', $(window).height()*0.2)
         $('#imageSensorConfigForm').jsonForm({
         schema: {
             resolution: {
@@ -300,9 +349,20 @@
             if (errors) {
             } else {
                 console.log(values);
+                let xhr = new XMLHttpRequest();
+                xhr.open("POST", "/settings");
+                xhr.setRequestHeader("Accept", "application/json");
+                xhr.setRequestHeader("Content-Type", "application/json");
+                xhr.send(JSON.stringify(values));
             }
         }
         });
+        $('#playStream').click(handlePlayStream);
+        $('#stopStream').click(handleStopStream);
+        $('#getJPEG').click(handleGetJPEG);
+        $('#getYUV422').click(handleGetYUV422);
+        $('#getRGB565').click(handleGetRGB565);
+        updateStats();
     </script>
   </body>
 </html>
