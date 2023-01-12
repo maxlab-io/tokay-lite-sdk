@@ -27,7 +27,6 @@
             <div class="tab-content" id="configTabContent">
               <div class="tab-pane fade show active mt-3" id="system" role="tabpanel" aria-labelledby="system-tab">
                 <form id="systemConfigForm" style="overflow-y:auto" >
-                  TODO
                 </form>
               </div>
               <div class="tab-pane fade mt-3" id="sensor" role="tabpanel" aria-labelledby="sensor-tab">
@@ -121,10 +120,9 @@
             xhr.send(null);
         }
 
-        console.log($(window).height());
-        console.log($('#statsRow').outerHeight());
         $('#imageSensorConfigForm').css('height', $(window).height()*0.65)
         $('#statsRow').css('height', $(window).height()*0.2)
+        // TODO: generate the schema in FW dynamically from the list of properties
         $('#imageSensorConfigForm').jsonForm({
         schema: {
             resolution: {
@@ -348,15 +346,36 @@
         onSubmit: function (errors, values) {
             if (errors) {
             } else {
-                console.log(values);
                 let xhr = new XMLHttpRequest();
                 xhr.open("POST", "/settings");
                 xhr.setRequestHeader("Accept", "application/json");
                 xhr.setRequestHeader("Content-Type", "application/json");
-                xhr.send(JSON.stringify(values));
+                xhr.send(JSON.stringify({'sensor_config': values}));
             }
         }
         });
+
+        $('#systemConfigForm').jsonForm({
+        schema: {
+            pir_enabled: {
+                type: 'boolean',
+                title: 'PIR Enabled',
+                required: true,
+                default: true
+            },
+        },
+        onSubmit: function (errors, values) {
+            if (errors) {
+            } else {
+                let xhr = new XMLHttpRequest();
+                xhr.open("POST", "/settings");
+                xhr.setRequestHeader("Accept", "application/json");
+                xhr.setRequestHeader("Content-Type", "application/json");
+                xhr.send(JSON.stringify({'system_config': values}));
+            }
+        }
+        });
+
         $('#playStream').click(handlePlayStream);
         $('#stopStream').click(handleStopStream);
         $('#getJPEG').click(handleGetJPEG);

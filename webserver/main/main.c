@@ -123,7 +123,7 @@ static httpd_handle_t streaming_server_handle;
 static temperature_sensor_handle_t temp_sensor;
 
 static config_desc_t system_config_desc[SYSTEM_CONFIG_MAX] = {
-    [SYSTEM_CONFIG_PIR_ENABLED] = { "pir_en", CONFIG_TYPE_INT },
+    [SYSTEM_CONFIG_PIR_ENABLED] = { "pir_enabled", CONFIG_TYPE_INT },
 };
 static config_value_t system_config_values[SYSTEM_CONFIG_MAX];
 static config_ctx_t system_config_ctx = {
