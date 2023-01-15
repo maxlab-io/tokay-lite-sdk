@@ -5,7 +5,9 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "freertos/timers.h"
+#include "freertos/event_groups.h"
 #include "driver/ledc.h"
 #include "driver/gpio.h"
 
@@ -37,6 +39,9 @@
 #define XCLK_DEFAULT_FREQ_HZ 16000000
 
 #define IR_MODE_TIMER_PERIOD_MS 1000
+
+#define CAMERA_THREAD_STACK_SIZE (4096 / sizeof(portBASE_TYPE))
+#define CAMERA_THREAD_PRIORITY   5
 
 #define TAG "ai_camera"
 
@@ -148,12 +153,174 @@ static camera_config_t camera_config = {
     //.fb_size = 1024 * 120, // TODO: port to esp32-camera upstream
 };
 
+typedef enum {
+    CAMERA_CMD_APPLY_SETTINGS,
+    CAMERA_CMD_GET_JPEG,
+    CAMERA_CMD_GET_YUV422,
+    CAMERA_CMD_GET_RGB565,
+
+    CAMERA_CMD_MAX = 32
+} camera_cmd_t;
+
 static struct {
     bool running;
     uint32_t light_sensor_value;
     ai_camera_ir_state_t ir_state;
     TimerHandle_t ir_mode_timer;
+    ai_camera_pipeline_t pipeline;
+    ai_camera_frame_cb_t p_frame_cb;
+    void *p_frame_cb_ctx;
+    TaskHandle_t camera_thread;
+    EventGroupHandle_t camera_thread_commands;
+    ai_camera_stats_t stats;
 } camera_ctx;
+
+static void load_config(void);
+static void set_default_config(void);
+static void ir_cut_on(void);
+static void ir_cut_off(void);
+static void ir_leds_on(uint8_t duty);
+static void ir_leds_off(void);
+static void ir_mode_day(void);
+static void ir_mode_night(void);
+static void update_ir_mode(void);
+static void ir_mode_timer_handler(TimerHandle_t timer);
+static void camera_thread_entry(void *pvParam);
+
+void ai_camera_init(int i2c_bus_id)
+{
+    set_default_config();
+    load_config();
+
+    gpio_set_level(IRCUT_CTRL_PIN, 0);
+    gpio_config_t io_conf = {};
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = (1LLU << IRCUT_CTRL_PIN);
+    io_conf.pull_down_en = 0;
+    io_conf.pull_up_en = 0;
+    gpio_config(&io_conf);
+
+    camera_ctx.ir_mode_timer = xTimerCreate("ir_tmr", pdMS_TO_TICKS(IR_MODE_TIMER_PERIOD_MS),
+                             pdFALSE, NULL, ir_mode_timer_handler);
+
+    camera_config.sccb_i2c_port = i2c_bus_id;
+}
+
+void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_cb, void *p_ctx)
+{
+    camera_config.pixel_format = PIXFORMAT_JPEG;
+    camera_ctx.running = true;
+    camera_ctx.pipeline = pipeline;
+    camera_ctx.p_frame_cb = p_cb;
+    camera_ctx.p_frame_cb_ctx = p_ctx;
+    camera_ctx.camera_thread_commands = xEventGroupCreate();
+    xTaskCreatePinnedToCore(camera_thread_entry, "AICAM", CAMERA_THREAD_STACK_SIZE,
+            NULL, CAMERA_THREAD_PRIORITY, &camera_ctx.camera_thread, 0);
+    configASSERT(&camera_ctx.camera_thread);
+    update_ir_mode();
+}
+
+void ai_camera_stop(void)
+{
+    esp_camera_deinit();
+    camera_ctx.running = false;
+}
+
+camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
+{
+    if (!camera_ctx.running) {
+        return NULL;
+    }
+    return NULL;
+}
+
+void ai_camera_fb_return(camera_fb_t *p_fb)
+{
+    esp_camera_fb_return(p_fb);
+}
+
+ai_camera_ir_state_t ai_camera_get_ir_state(void)
+{
+    return camera_ctx.ir_state;
+}
+
+uint32_t ai_camera_get_light_level(void)
+{
+    return camera_ctx.light_sensor_value;
+}
+
+const char *ai_camera_config_get_name(ai_camera_config_t config)
+{
+    return config_get_name(&config_ctx, (int)config);
+}
+
+const void *ai_camera_config_get_value(ai_camera_config_t config)
+{
+    return config_get_value(&config_ctx, (int)config);
+}
+
+int ai_camera_config_get_value_int(ai_camera_config_t config)
+{
+    return *(int *)config_get_value(&config_ctx, (int)config);
+}
+
+void ai_camera_config_set_value(ai_camera_config_t config, const void *p_value)
+{
+    config_set_value(&config_ctx, (int)config, p_value);
+}
+
+void ai_camera_config_set_value_int(ai_camera_config_t config, int value)
+{
+    config_set_value(&config_ctx, (int)config, &value);
+}
+
+ai_camera_config_t ai_camera_config_get_by_name(const char *name)
+{
+    return (int)config_get_by_name(&config_ctx, name);
+}
+
+config_type_t ai_camera_config_get_type(ai_camera_config_t config)
+{
+    return config_get_type(&config_ctx, (int)config);
+}
+
+void ai_camera_config_apply(void)
+{
+}
+
+void ai_camera_process_settings_json(const cJSON *p_settings)
+{
+    cJSON *p_cfg_val = NULL;
+    cJSON_ArrayForEach(p_cfg_val, p_settings)
+    {
+        ai_camera_config_t config = ai_camera_config_get_by_name(p_cfg_val->string);
+        if (AI_CAMERA_CONFIG_MAX == config) {
+            ESP_LOGE(TAG, "Unknown config variable %s", p_cfg_val->string);
+            continue;
+        }
+        switch (ai_camera_config_get_type(config)) {
+        case CONFIG_TYPE_STRING:
+            if (!cJSON_IsString(p_cfg_val)) {
+                ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
+                continue;
+            }
+            ai_camera_config_set_value(config, &p_cfg_val->valuestring);
+            break;
+        case CONFIG_TYPE_INT: {
+            if (!cJSON_IsNumber(p_cfg_val)) {
+                ESP_LOGE(TAG, "Wrong config variable type %s, expected number", p_cfg_val->string);
+                continue;
+            }
+            ai_camera_config_set_value_int(config, (int)p_cfg_val->valuedouble);
+            break;
+        }
+        default:
+            assert(0);
+            break;
+        }
+    }
+}
 
 static void load_config(void)
 {
@@ -192,17 +359,17 @@ static void set_default_config(void)
     }
 }
 
-void ir_cut_on(void)
+static void ir_cut_on(void)
 {
     gpio_set_level(IRCUT_CTRL_PIN, 0);
 }
 
-void ir_cut_off(void)
+static void ir_cut_off(void)
 {
     gpio_set_level(IRCUT_CTRL_PIN, 1);
 }
 
-void ir_leds_on(uint8_t duty)
+static void ir_leds_on(uint8_t duty)
 {
     ledc_timer_config_t ledc_timer = {
         .speed_mode       = LEDC_LOW_SPEED_MODE,
@@ -227,7 +394,7 @@ void ir_leds_on(uint8_t duty)
     ESP_ERROR_CHECK(ret);
 }
 
-void ir_leds_off(void)
+static void ir_leds_off(void)
 {
     ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, 0);
 }
@@ -281,148 +448,28 @@ static void ir_mode_timer_handler(TimerHandle_t timer)
     update_ir_mode();
 }
 
-void ai_camera_init(int i2c_bus_id)
+static void camera_thread_entry(void *pvParam)
 {
-    set_default_config();
-    load_config();
-    ai_camera_config_apply();
-
-    gpio_set_level(IRCUT_CTRL_PIN, 0);
-    gpio_config_t io_conf = {};
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1LLU << IRCUT_CTRL_PIN);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-
-    camera_ctx.ir_mode_timer = xTimerCreate("ir_tmr", pdMS_TO_TICKS(IR_MODE_TIMER_PERIOD_MS),
-                             pdFALSE, NULL, ir_mode_timer_handler);
-
-    camera_config.sccb_i2c_port = i2c_bus_id;
-}
-
-void ai_camera_start(pixformat_t pixformat)
-{
-    camera_config.pixel_format = pixformat;
     esp_err_t err = esp_camera_init(&camera_config);
     if (ESP_OK != err) {
         ESP_LOGE(TAG, "Camera initialization failed: %s", esp_err_to_name(err));
-        return;
-    }
-    camera_ctx.running = true;
-    update_ir_mode();
-}
-
-void ai_camera_stop(void)
-{
-    esp_camera_deinit();
-    camera_ctx.running = false;
-}
-
-camera_fb_t *ai_camera_get_frame(TickType_t timeout_ms)
-{
-    (void)timeout_ms;
-    if (!camera_ctx.running) {
-        return NULL;
-    }
-    return esp_camera_fb_get(); // TODO: pass timeout here
-}
-
-void ai_camera_fb_return(camera_fb_t *p_fb)
-{
-    esp_camera_fb_return(p_fb);
-}
-
-void ai_camera_set_pixformat(pixformat_t pixformat)
-{
-    if (pixformat != camera_config.pixel_format && camera_ctx.running) {
-        ai_camera_stop();
-        ai_camera_start(pixformat);
-    } else {
-        camera_config.pixel_format = pixformat;
-    }
-}
-
-ai_camera_ir_state_t ai_camera_get_ir_state(void)
-{
-    return camera_ctx.ir_state;
-}
-
-uint32_t ai_camera_get_light_level(void)
-{
-    return camera_ctx.light_sensor_value;
-}
-
-const char *ai_camera_config_get_name(ai_camera_config_t config)
-{
-    return config_get_name(&config_ctx, (int)config);
-}
-
-const void *ai_camera_config_get_value(ai_camera_config_t config)
-{
-    return config_get_value(&config_ctx, (int)config);
-}
-
-int ai_camera_config_get_value_int(ai_camera_config_t config)
-{
-    return *(int *)config_get_value(&config_ctx, (int)config);
-}
-
-void ai_camera_config_set_value(ai_camera_config_t config, const void *p_value)
-{
-    config_set_value(&config_ctx, (int)config, p_value);
-}
-
-void ai_camera_config_set_value_int(ai_camera_config_t config, int value)
-{
-    config_set_value(&config_ctx, (int)config, &value);
-}
-
-ai_camera_config_t ai_camera_config_get_by_name(const char *name)
-{
-    return (int)config_get_by_name(&config_ctx, name);
-}
-
-config_type_t ai_camera_config_get_type(ai_camera_config_t config)
-{
-    return config_get_type(&config_ctx, (int)config);
-}
-
-void ai_camera_config_apply(void)
-{
-    // TODO: boilerplate
-}
-
-void ai_camera_process_settings_json(const cJSON *p_settings)
-{
-    cJSON *p_cfg_val = NULL;
-    cJSON_ArrayForEach(p_cfg_val, p_settings)
-    {
-        ai_camera_config_t config = ai_camera_config_get_by_name(p_cfg_val->string);
-        if (AI_CAMERA_CONFIG_MAX == config) {
-            ESP_LOGE(TAG, "Unknown config variable %s", p_cfg_val->string);
-            continue;
+        while (1) {
+            vTaskDelay(1000);
         }
-        switch (ai_camera_config_get_type(config)) {
-        case CONFIG_TYPE_STRING:
-            if (!cJSON_IsString(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
-                continue;
-            }
-            ai_camera_config_set_value(config, &p_cfg_val->valuestring);
-            break;
-        case CONFIG_TYPE_INT: {
-            if (!cJSON_IsNumber(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected number", p_cfg_val->string);
-                continue;
-            }
-            ai_camera_config_set_value_int(config, (int)p_cfg_val->valuedouble);
-            break;
+    }
+    while (1) {
+        const uint32_t commands = xEventGroupGetBits(camera_ctx.camera_thread_commands);
+        if (commands & (1 << CAMERA_CMD_APPLY_SETTINGS)) {
+            // TODO
         }
-        default:
-            assert(0);
-            break;
+        if (commands & (1 << CAMERA_CMD_GET_JPEG)) {
+            // TODO
+        }
+        if (commands & (1 << CAMERA_CMD_GET_YUV422)) {
+            // TODO
+        }
+        if (commands & (1 << CAMERA_CMD_GET_RGB565)) {
+            // TODO
         }
     }
 }

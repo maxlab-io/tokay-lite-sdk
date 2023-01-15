@@ -106,18 +106,18 @@
             makeDownload("/image.rgb565");
         }
 
-        function updateStats() {
-            let xhr = new XMLHttpRequest();
-            xhr.open("GET", "/sensors");
-            xhr.setRequestHeader("Accept", "application/json");
-            xhr.onload = () => {
-                const resp_json = JSON.parse(xhr.responseText);
+      function openTelemetrySocket() {
+            let socket = new WebSocket("/telemetry");
+            socket.onmessage = function(event) {
+                console.log(`Telemetry message received: ${event.data}`)
+                const resp_json = JSON.parse(event.data);
                 for (let k in resp_json) {
                     $(`#{k}Value`).html(resp_json[k]);
                 }
-                setTimeout(updateStats, 1000);
             }
-            xhr.send(null);
+            socket.onopen() = function(event) {
+                socket.send('{}'); // Send a dummy JSON frame to start telemetry streaming
+            }
         }
 
         $('#imageSensorConfigForm').css('height', $(window).height()*0.65)
@@ -381,7 +381,6 @@
         $('#getJPEG').click(handleGetJPEG);
         $('#getYUV422').click(handleGetYUV422);
         $('#getRGB565').click(handleGetRGB565);
-        updateStats();
     </script>
   </body>
 </html>

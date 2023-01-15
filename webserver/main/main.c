@@ -11,6 +11,9 @@
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
+
 #include "ai_camera.h"
 #include "config.h"
 #include "pir.h"
@@ -50,7 +53,7 @@ static esp_err_t http_handler_get_picture(httpd_req_t *req);
 static esp_err_t http_handler_get_stream(httpd_req_t *req);
 static esp_err_t http_handler_get_settings(httpd_req_t *req);
 static esp_err_t http_handler_set_settings(httpd_req_t *req);
-static esp_err_t http_handler_get_sensors(httpd_req_t *req);
+static esp_err_t http_handler_ws_telemetry(httpd_req_t *req);
 
 const char *system_config_get_name(system_config_t config);
 const void *system_config_get_value(system_config_t config);
@@ -58,6 +61,7 @@ void system_config_set_value(system_config_t config, const void *p_value);
 system_config_t system_config_get_by_name(const char *name);
 config_type_t system_config_get_type(system_config_t config);
 void system_config_apply(void);
+static esp_err_t send_telemetry(void *arg);
 
 extern const char index_html_start[] asm("_binary_index_html_start");
 
@@ -89,13 +93,6 @@ static const httpd_uri_t handler_rgb565 = {
     .user_ctx  = (void *)HTTP_IMAGE_FORMAT_RGB565,
 };
 
-static const httpd_uri_t handler_stream = {
-    .uri       = "/stream",
-    .method    = HTTP_GET,
-    .handler   = http_handler_get_stream,
-    .user_ctx  = NULL,
-};
-
 static const httpd_uri_t handler_get_settings = {
     .uri       = "/settings",
     .method    = HTTP_GET,
@@ -110,10 +107,18 @@ static const httpd_uri_t handler_set_settings = {
     .user_ctx  = NULL,
 };
 
-static const httpd_uri_t handler_get_sensors = {
-    .uri       = "/sensors",
+static const httpd_uri_t handler_ws_telemetry = {
+    .uri       = "/telemetry",
     .method    = HTTP_GET,
-    .handler   = http_handler_get_sensors,
+    .handler   = http_handler_ws_telemetry,
+    .user_ctx  = NULL,
+    .is_websocket = true,
+};
+
+static const httpd_uri_t handler_stream = {
+    .uri       = "/stream",
+    .method    = HTTP_GET,
+    .handler   = http_handler_get_stream,
     .user_ctx  = NULL,
 };
 
@@ -134,6 +139,8 @@ static config_ctx_t system_config_ctx = {
 
 static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t vbat_adc_cali_handle;
+
+static TimerHandle_t telemetry_timer;
 
 static bool init_adc_calibration(adc_unit_t unit, adc_atten_t atten, adc_cali_handle_t *out_handle)
 {
@@ -218,7 +225,7 @@ static void start_httpd(void)
     ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &handler_rgb565));
     ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &handler_get_settings));
     ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &handler_set_settings));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &handler_get_sensors));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &handler_ws_telemetry));
 
     // Run a separate httpd instance for JPEG streaming
     httpd_config_t streamer_config = HTTPD_DEFAULT_CONFIG();
@@ -256,7 +263,7 @@ void app_main(void)
     init_vbat_adc();
 
     ai_camera_init(I2C_BUS_ID);
-    ai_camera_start(PIXFORMAT_JPEG); // TODO: manage FPS?
+    ai_camera_start(AI_CAMERA_PIPELINE_DISCARD, NULL, NULL);
 
     temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
     ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor_config, &temp_sensor));
@@ -298,8 +305,7 @@ static esp_err_t http_handler_get_picture(httpd_req_t *req)
     default:
         assert(0);
     }
-    ai_camera_set_pixformat(target_pixformat);
-    camera_fb_t *p_fb = ai_camera_get_frame(pdMS_TO_TICKS(500));
+    camera_fb_t *p_fb = ai_camera_get_frame(target_pixformat, pdMS_TO_TICKS(500));
     if (NULL == p_fb) {
         httpd_resp_set_status(req, "500 Capture timeout");
         httpd_resp_send(req, NULL, 0);
@@ -310,44 +316,6 @@ static esp_err_t http_handler_get_picture(httpd_req_t *req)
     httpd_resp_set_type(req, http_content_type);
     httpd_resp_send(req, (const char *)p_fb->buf, p_fb->len);
     ai_camera_fb_return(p_fb);
-    return ESP_OK;
-}
-
-static esp_err_t http_handler_get_stream(httpd_req_t *req)
-{
-    ai_camera_set_pixformat(PIXFORMAT_JPEG);
-    esp_err_t ret = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    char part_buf[64];
-
-    while (true) {
-        camera_fb_t *p_fb = ai_camera_get_frame(pdMS_TO_TICKS(500));
-        if (NULL == p_fb) {
-            httpd_resp_set_status(req, "500 Capture timeout");
-            httpd_resp_send(req, NULL, 0);
-            return ESP_OK;
-        }
-
-        ret = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
-        if (ESP_OK == ret) {
-            const int len = snprintf(part_buf, sizeof(part_buf), _STREAM_PART, p_fb->len);
-            if (len >= 0 && len <= sizeof(part_buf)) {
-                ret = httpd_resp_send_chunk(req, (const char *)part_buf, len);
-            } else {
-                ret = ESP_FAIL;
-            }
-        }
-        if (ESP_OK == ret) {
-            ret = httpd_resp_send_chunk(req, (const char *)p_fb->buf, p_fb->len);
-        }
-        ai_camera_fb_return(p_fb);
-        if (ESP_OK != ret) {
-            return ret;
-        }
-    }
     return ESP_OK;
 }
 
@@ -488,8 +456,17 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
     return httpd_resp_send(req, NULL, 0);
 }
 
-static esp_err_t http_handler_get_sensors(httpd_req_t *req)
+static void telemetry_timer_cb(TimerHandle_t handle)
 {
+    httpd_queue_work(http_server_handle, send_telemetry, pvTimerGetTimerID(handle));
+}
+
+static esp_err_t send_telemetry(void *arg)
+{
+    const int fd = (int)arg;
+    vTimerSetTimerID(telemetry_timer, (void *)arg);
+    xTimerReset(telemetry_timer, portMAX_DELAY);
+
     cJSON *p_root = cJSON_CreateObject();
     if (NULL == p_root) {
         goto fail;
@@ -507,20 +484,100 @@ static esp_err_t http_handler_get_sensors(httpd_req_t *req)
     if (NULL == p_response) {
         goto fail;
     }
-    httpd_resp_set_status(req, "200 OK");
-    httpd_resp_set_type(req, "application/json");
-    esp_err_t ret = httpd_resp_send(req, p_response, strlen(p_response));
-    free(p_response);
     cJSON_Delete(p_root);
+
+    httpd_ws_frame_t ws_pkt = { 0 };
+    ws_pkt.payload = (uint8_t*)p_response;
+    ws_pkt.len = strlen(p_response);
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    const esp_err_t ret = httpd_ws_send_frame_async(http_server_handle, fd, &ws_pkt);
+    free(p_response);
     return ret;
 fail:
     cJSON_Delete(p_root);
-    httpd_resp_set_status(req, "500 Internal server error");
-    httpd_resp_send(req, NULL, 0);
+    ESP_LOGE(TAG, "Failed to generate telemetry JSON");
+    return ESP_FAIL;
+}
+
+static esp_err_t ws_recv_frame(httpd_req_t *p_req, httpd_ws_frame_t *p_ws_pkt, uint8_t **p_buffer)
+{
+    memset(p_ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    p_ws_pkt->type = HTTPD_WS_TYPE_TEXT;
+    /* Set max_len = 0 to get the frame len */
+    esp_err_t ret = httpd_ws_recv_frame(p_req, p_ws_pkt, 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_ws_recv_frame failed to get frame len with %d", ret);
+        return ret;
+    }
+    ESP_LOGI(TAG, "frame len is %d", p_ws_pkt->len);
+    if (p_ws_pkt->len) {
+        *p_buffer = calloc(1, p_ws_pkt->len);
+        if (NULL == *p_buffer) {
+            ESP_LOGE(TAG, "Failed to calloc memory for buf");
+            return ESP_ERR_NO_MEM;
+        }
+        p_ws_pkt->payload = *p_buffer;
+        /* Set max_len = ws_pkt.len to get the frame payload */
+        ret = httpd_ws_recv_frame(p_req, p_ws_pkt, p_ws_pkt->len);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
+            free(*p_buffer);
+            return ret;
+        }
+        ESP_LOGI(TAG, "Got packet with message: %s", p_ws_pkt->payload);
+    }
+    ESP_LOGI(TAG, "Packet type: %d", p_ws_pkt->type);
+    return ESP_OK;
+}
+
+static esp_err_t http_handler_ws_telemetry(httpd_req_t *req)
+{
+    if (req->method == HTTP_GET) {
+        ESP_LOGI(TAG, "Handshake done, a new WS connection was opened");
+        send_telemetry(httpd_req_to_sockfd(req));
+    }
+
     return ESP_OK;
 }
 
 void system_config_apply(void)
 {
     // TODO
+}
+
+static esp_err_t http_handler_get_stream(httpd_req_t *req)
+{
+    esp_err_t ret = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    char part_buf[64];
+
+    while (true) {
+        camera_fb_t *p_fb = ai_camera_get_frame(PIXFORMAT_JPEG, pdMS_TO_TICKS(500));
+        if (NULL == p_fb) {
+            httpd_resp_set_status(req, "500 Capture timeout");
+            httpd_resp_send(req, NULL, 0);
+            return ESP_OK;
+        }
+
+        ret = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+        if (ESP_OK == ret) {
+            const int len = snprintf(part_buf, sizeof(part_buf), _STREAM_PART, p_fb->len);
+            if (len >= 0 && len <= sizeof(part_buf)) {
+                ret = httpd_resp_send_chunk(req, (const char *)part_buf, len);
+            } else {
+                ret = ESP_FAIL;
+            }
+        }
+        if (ESP_OK == ret) {
+            ret = httpd_resp_send_chunk(req, (const char *)p_fb->buf, p_fb->len);
+        }
+        ai_camera_fb_return(p_fb);
+        if (ESP_OK != ret) {
+            return ret;
+        }
+    }
+    return ESP_OK;
 }

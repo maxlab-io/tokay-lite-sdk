@@ -58,14 +58,31 @@ typedef enum {
     AI_CAMERA_CONFIG_MAX
 } ai_camera_config_t;
 
+typedef enum {
+    AI_CAMERA_PIPELINE_DISCARD,
+    AI_CAMERA_PIPELINE_PASSTHROUGH,
+    AI_CAMERA_PIPELINE_CNN,
+
+    AI_CAMERA_PIPELINE_MAX
+} ai_camera_pipeline_t;
+
+typedef struct {
+    uint32_t frame_time_ms;
+    uint32_t cnn_processing_ms;
+    uint32_t codec_processing_ms;
+} ai_camera_stats_t;
+
+typedef void (*ai_camera_frame_cb_t)(pixformat_t format, const uint8_t *p_data, uint32_t size,
+                                     bool start_of_frame, void *p_ctx);
+
 void ai_camera_init(int i2c_bus_id);
-void ai_camera_start(pixformat_t pixformat);
+void ai_camera_start(ai_camera_pipeline_t pipeline_type, ai_camera_frame_cb_t p_cb, void *p_ctx);
 void ai_camera_stop(void);
 
-camera_fb_t *ai_camera_get_frame(TickType_t timeout_ms);
+camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms);
 void ai_camera_fb_return(camera_fb_t *p_fb);
 
-void ai_camera_set_pixformat(pixformat_t pixformat);
+void ai_camera_get_stats(ai_camera_stats_t *p_stats_out);
 
 ai_camera_ir_state_t ai_camera_get_ir_state(void);
 uint32_t ai_camera_get_light_level(void);
