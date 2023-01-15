@@ -1,3 +1,6 @@
 [submodule "external/esp32-camera"]
   path = external/esp32-camera
   url = git@github.com:espressif/esp32-camera.git
+[submodule "external/tflite-micro-esp-examples"]
+	path = external/tflite-micro-esp-examples
+	url = git@github.com:espressif/tflite-micro-esp-examples.git
