@@ -141,6 +141,7 @@ void app_httpd_start(void)
     config.server_port = 80;
     config.lru_purge_enable = true;
     config.core_id = 0;
+    config.max_uri_handlers = 9;
     ESP_ERROR_CHECK(httpd_start(&app_httpd_ctx.http_server_handle, &config));
 
     ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_index));
@@ -159,6 +160,8 @@ void app_httpd_start(void)
     streamer_config.server_port = STREAMING_HTTP_SERVER_PORT;
     streamer_config.lru_purge_enable = true;
     streamer_config.core_id = 0;
+    streamer_config.max_uri_handlers = 1;
+    streamer_config.ctrl_port++; // avoid conflicts with the main HTTP server
     ESP_ERROR_CHECK(httpd_start(&app_httpd_ctx.streaming_server_handle, &streamer_config));
     ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.streaming_server_handle, &handler_stream));
     app_httpd_ctx.is_running = true;

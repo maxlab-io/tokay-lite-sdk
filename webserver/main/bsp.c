@@ -21,7 +21,7 @@
 #define I2C_SCL_PIN 3
 
 #define BUTTON_DEBOUNCE_TIME_MS 50
-#define BUTTON_PIN              41
+#define BUTTON_PIN              41LLU
 
 #define TAG "bsp"
 
@@ -162,7 +162,7 @@ static void init_button(void)
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_NEGEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1UL << BUTTON_PIN);
+    io_conf.pin_bit_mask = (1LLU << BUTTON_PIN);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 1;
     ESP_ERROR_CHECK(gpio_config(&io_conf));

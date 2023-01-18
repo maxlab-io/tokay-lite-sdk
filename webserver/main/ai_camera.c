@@ -40,7 +40,7 @@
 
 #define IR_MODE_TIMER_PERIOD_MS 1000
 
-#define CAMERA_THREAD_STACK_SIZE (4096 / sizeof(portBASE_TYPE))
+#define CAMERA_THREAD_STACK_SIZE (4096)
 #define CAMERA_THREAD_PRIORITY   5
 
 #define TAG "ai_camera"
