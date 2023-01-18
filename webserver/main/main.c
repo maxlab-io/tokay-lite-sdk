@@ -20,6 +20,8 @@
 
 static config_desc_t system_config_desc[SYSTEM_CONFIG_MAX] = {
     [SYSTEM_CONFIG_PIR_ENABLED] = { "pir_enabled", CONFIG_TYPE_INT },
+    [SYSTEM_CONFIG_WIFI_SSID] = { "wifi_ssid", CONFIG_TYPE_STRING },
+    [SYSTEM_CONFIG_WIFI_PASSWORD] = { "wifi_password", CONFIG_TYPE_STRING },
 };
 
 static config_value_t system_config_values[SYSTEM_CONFIG_MAX];
@@ -81,6 +83,40 @@ config_type_t system_config_get_type(system_config_t config)
 void system_config_apply(void)
 {
     // TODO
+}
+
+void system_config_process_json(const cJSON *p_settings)
+{
+    cJSON *p_cfg_val = NULL;
+    cJSON_ArrayForEach(p_cfg_val, p_settings)
+    {
+        system_config_t config = system_config_get_by_name(p_cfg_val->string);
+        if (SYSTEM_CONFIG_MAX == config) {
+            ESP_LOGE(TAG, "Unknown config variable %s", p_cfg_val->string);
+            continue;
+        }
+        switch (system_config_get_type(config)) {
+        case CONFIG_TYPE_STRING:
+            if (!cJSON_IsString(p_cfg_val)) {
+                ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
+                continue;
+            }
+            system_config_set_value(config, &p_cfg_val->valuestring);
+            break;
+        case CONFIG_TYPE_INT: {
+            if (!cJSON_IsNumber(p_cfg_val)) {
+                ESP_LOGE(TAG, "Wrong config variable type %s, expected number", p_cfg_val->string);
+                continue;
+            }
+            const int valueint = (int)p_cfg_val->valuedouble;
+            system_config_set_value(config, &valueint);
+            break;
+        }
+        default:
+            assert(0);
+            break;
+        }
+    }
 }
 
 static void pir_motion_callback(void *ctx)

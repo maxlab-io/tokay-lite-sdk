@@ -21,6 +21,8 @@
 #define STREAMING_HTTP_SERVER_PORT 1111
 #define SETTINGS_JSON_MAX_SIZE     1024
 
+#define TELEMETRY_UPDATE_PERIOD_MS 1000
+
 #define TAG "app_httpd"
 
 typedef enum {
@@ -28,6 +30,13 @@ typedef enum {
     HTTP_IMAGE_FORMAT_YUV422,
     HTTP_IMAGE_FORMAT_RGB565,
 } http_image_format_t;
+
+typedef enum {
+    HTTP_SETTINGS_TYPE_CAMERA,
+    HTTP_SETTINGS_TYPE_SYSTEM,
+
+    HTTP_SETTINGS_TYPE_MAX,
+} http_settings_type_t;
 
 static esp_err_t http_handler_get_static_page(httpd_req_t *req);
 static esp_err_t http_handler_get_picture(httpd_req_t *req);
@@ -71,18 +80,32 @@ static const httpd_uri_t handler_rgb565 = {
     .user_ctx  = (void *)HTTP_IMAGE_FORMAT_RGB565,
 };
 
-static const httpd_uri_t handler_get_settings = {
-    .uri       = "/settings",
+static const httpd_uri_t handler_get_camera_settings = {
+    .uri       = "/settings/camera",
     .method    = HTTP_GET,
     .handler   = http_handler_get_settings,
-    .user_ctx  = NULL,
+    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_CAMERA,
 };
 
-static const httpd_uri_t handler_set_settings = {
-    .uri       = "/settings",
+static const httpd_uri_t handler_get_system_settings = {
+    .uri       = "/settings/system",
+    .method    = HTTP_GET,
+    .handler   = http_handler_get_settings,
+    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_SYSTEM,
+};
+
+static const httpd_uri_t handler_set_camera_settings = {
+    .uri       = "/settings/camera",
     .method    = HTTP_POST,
     .handler   = http_handler_set_settings,
-    .user_ctx  = NULL,
+    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_CAMERA,
+};
+
+static const httpd_uri_t handler_set_system_settings = {
+    .uri       = "/settings/system",
+    .method    = HTTP_POST,
+    .handler   = http_handler_set_settings,
+    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_CAMERA,
 };
 
 static const httpd_uri_t handler_ws_telemetry = {
@@ -109,6 +132,10 @@ static struct {
 
 void app_httpd_start(void)
 {
+    if (NULL == app_httpd_ctx.telemetry_timer) {
+        app_httpd_ctx.telemetry_timer = xTimerCreate("TELEMETRY", pdMS_TO_TICKS(TELEMETRY_UPDATE_PERIOD_MS),
+                             pdFALSE, NULL, telemetry_timer_cb);
+    }
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = NULL;
     config.server_port = 80;
@@ -120,8 +147,10 @@ void app_httpd_start(void)
     ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_jpeg));
     ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_yuv422));
     ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_rgb565));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_settings));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_settings));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_camera_settings));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_system_settings));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_camera_settings));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_system_settings));
     ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_ws_telemetry));
 
     // Run a separate httpd instance for JPEG streaming
@@ -197,48 +226,41 @@ static esp_err_t http_handler_get_picture(httpd_req_t *req)
 
 static esp_err_t http_handler_get_settings(httpd_req_t *req)
 {
+    http_settings_type_t settings_type = (http_settings_type_t)req->user_ctx;
     cJSON *p_root = cJSON_CreateObject();
     if (NULL == p_root) {
         goto fail;
     }
 
-    cJSON *p_sensor_config = cJSON_AddObjectToObject(p_root, "sensor_config");
-    if (NULL == p_sensor_config) {
-        goto fail;
-    }
-    for (int i = 0; i < AI_CAMERA_CONFIG_MAX; i++) {
-        const char *p_name = ai_camera_config_get_name(i);
-        switch (ai_camera_config_get_type(i)) {
-        case CONFIG_TYPE_STRING:
-            cJSON_AddStringToObject(p_sensor_config, p_name,
-                                                *(const char **)ai_camera_config_get_value(i));
-            break;
-        case CONFIG_TYPE_INT:
-            cJSON_AddNumberToObject(p_sensor_config, p_name,
-                                                *(int *)ai_camera_config_get_value(i));
-            break;
-        default:
-            assert(0);
-            break;
+    if (HTTP_SETTINGS_TYPE_CAMERA == settings_type) {
+        for (int i = 0; i < AI_CAMERA_CONFIG_MAX; i++) {
+            const char *p_name = ai_camera_config_get_name(i);
+            switch (ai_camera_config_get_type(i)) {
+            case CONFIG_TYPE_STRING:
+                cJSON_AddStringToObject(p_root, p_name, *(const char **)ai_camera_config_get_value(i));
+                break;
+            case CONFIG_TYPE_INT:
+                cJSON_AddNumberToObject(p_root, p_name, *(int *)ai_camera_config_get_value(i));
+                break;
+            default:
+                assert(0);
+                break;
+            }
         }
-    }
-
-    cJSON *p_system_config = cJSON_AddObjectToObject(p_root, "system_config");
-    if (NULL == p_system_config) {
-        goto fail;
-    }
-    for (int i = 0; i < SYSTEM_CONFIG_MAX; i++) {
-        const char *p_name = system_config_get_name(i);
-        switch (system_config_get_type(i)) {
-        case CONFIG_TYPE_STRING:
-            cJSON_AddStringToObject(p_sensor_config, p_name, *(const char **)system_config_get_value(i));
-            break;
-        case CONFIG_TYPE_INT:
-            cJSON_AddNumberToObject(p_sensor_config, p_name, *(int *)system_config_get_value(i));
-            break;
-        default:
-            assert(0);
-            break;
+    } else if (HTTP_SETTINGS_TYPE_SYSTEM == settings_type) {
+        for (int i = 0; i < SYSTEM_CONFIG_MAX; i++) {
+            const char *p_name = system_config_get_name(i);
+            switch (system_config_get_type(i)) {
+            case CONFIG_TYPE_STRING:
+                cJSON_AddStringToObject(p_root, p_name, *(const char **)system_config_get_value(i));
+                break;
+            case CONFIG_TYPE_INT:
+                cJSON_AddNumberToObject(p_root, p_name, *(int *)system_config_get_value(i));
+                break;
+            default:
+                assert(0);
+                break;
+            }
         }
     }
 
@@ -261,6 +283,7 @@ fail:
 
 static esp_err_t http_handler_set_settings(httpd_req_t *req)
 {
+    http_settings_type_t settings_type = (http_settings_type_t)req->user_ctx;
     if (req->content_len > SETTINGS_JSON_MAX_SIZE) {
         ESP_LOGE(TAG, "Settings JSON too big %d", req->content_len);
         return ESP_FAIL;
@@ -286,45 +309,15 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    cJSON *p_sensor_config = cJSON_GetObjectItemCaseSensitive(p_settings, "sensor_config");
-    ai_camera_process_settings_json(p_sensor_config);
-
-    cJSON *p_system_config = cJSON_GetObjectItemCaseSensitive(p_settings, "system_config");
-    cJSON *p_cfg_val = NULL;
-    cJSON_ArrayForEach(p_cfg_val, p_system_config)
-    {
-        system_config_t config = system_config_get_by_name(p_cfg_val->string);
-        if (SYSTEM_CONFIG_MAX == config) {
-            ESP_LOGE(TAG, "Unknown config variable %s", p_cfg_val->string);
-            continue;
-        }
-        switch (system_config_get_type(config)) {
-        case CONFIG_TYPE_STRING:
-            if (!cJSON_IsString(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
-                continue;
-            }
-            system_config_set_value(config, &p_cfg_val->valuestring);
-            break;
-        case CONFIG_TYPE_INT: {
-            if (!cJSON_IsNumber(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected number", p_cfg_val->string);
-                continue;
-            }
-            const int valueint = (int)p_cfg_val->valuedouble;
-            system_config_set_value(config, &valueint);
-            break;
-        }
-        default:
-            assert(0);
-            break;
-        }
+    if (HTTP_SETTINGS_TYPE_CAMERA == settings_type) {
+        ai_camera_process_settings_json(p_settings);
+        ai_camera_config_apply();
+    } else if (HTTP_SETTINGS_TYPE_SYSTEM == settings_type) {
+        system_config_process_json(p_settings);
+        system_config_apply();
     }
 
     cJSON_Delete(p_settings);
-
-    ai_camera_config_apply();
-    system_config_apply();
 
     httpd_resp_set_status(req, "200 OK");
     return httpd_resp_send(req, NULL, 0);

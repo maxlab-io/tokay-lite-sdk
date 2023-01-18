@@ -363,6 +363,18 @@
                 required: true,
                 default: true
             },
+            wifi_ssid: {
+                type: 'string',
+                title: 'WIFI SSID',
+                required: false,
+                default: ""
+            },
+            wifi_password: {
+                type: 'string',
+                title: 'WIFI password',
+                required: false,
+                default: ""
+            },
         },
         onSubmit: function (errors, values) {
             if (errors) {
