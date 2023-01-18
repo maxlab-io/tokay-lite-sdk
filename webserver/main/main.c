@@ -3,11 +3,15 @@
 #include "esp_camera.h"
 #include "sensor.h"
 
-#include "esp_log.h"
 #include "cJSON.h"
 #include "driver/gpio.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+
 #include "nvs_flash.h"
+#include "esp_log.h"
 
 #include "bsp.h"
 #include "pir.h"
@@ -17,6 +21,10 @@
 #include "network.h"
 
 #define TAG "main"
+
+#define EVENT_QUEUE_SIZE 5
+#define APP_TASK_STACK_SIZE 4096
+#define APP_TASK_PRIORITY   5
 
 static config_desc_t system_config_desc[SYSTEM_CONFIG_MAX] = {
     [SYSTEM_CONFIG_PIR_ENABLED] = { "pir_enabled", CONFIG_TYPE_INT },
@@ -31,28 +39,18 @@ static config_ctx_t system_config_ctx = {
     .p_values = system_config_values,
 };
 
+static QueueHandle_t event_queue;
+
 static void pir_motion_callback(void *ctx);
 static void wifi_connection_callback(void);
+static void button_callback(void);
+static void app_task(void *pvArg);
 
 void app_main(void)
 {
-    gpio_install_isr_service(0);
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    network_init("ai-camera", wifi_connection_callback);
-
-    bsp_init();
-    pir_init(pir_motion_callback, NULL);
-
-    ai_camera_init(BSP_I2C_BUS_ID);
-    ai_camera_start(AI_CAMERA_PIPELINE_DISCARD, NULL, NULL);
-
-    app_httpd_start();
+    BaseType_t xRet = xTaskCreatePinnedToCore(app_task, "APP_TSK", APP_TASK_STACK_SIZE,
+            NULL, APP_TASK_PRIORITY, NULL, 0);
+    configASSERT(pdTRUE == xRet);
 }
 
 const char *system_config_get_name(system_config_t config)
@@ -83,6 +81,12 @@ config_type_t system_config_get_type(system_config_t config)
 void system_config_apply(void)
 {
     // TODO
+}
+
+void app_send_event(app_event_t ev)
+{
+    BaseType_t xRet = xQueueSend(event_queue, &ev, 0);
+    assert(pdTRUE == xRet);
 }
 
 void system_config_process_json(const cJSON *p_settings)
@@ -121,9 +125,101 @@ void system_config_process_json(const cJSON *p_settings)
 
 static void pir_motion_callback(void *ctx)
 {
-    // TODO: store events in a list to be reported to the front-end
+    app_send_event(APP_EVENT_PIR_MOTION_DETECTED);
+}
+
+static void button_callback(void)
+{
+    app_send_event(APP_EVENT_BUTTON_PRESSED);
 }
 
 static void wifi_connection_callback(void)
 {
+    app_send_event(APP_EVENT_WIFI_CONNECTED);
+}
+
+static bool load_wifi_creds(void)
+{
+    char wifi_ssid[33] = { 0 };
+    char wifi_password[64] = { 0 } ;
+
+    network_get_credentials(wifi_ssid, wifi_password);
+
+    system_config_set_value(SYSTEM_CONFIG_WIFI_SSID, wifi_ssid);
+    system_config_set_value(SYSTEM_CONFIG_WIFI_PASSWORD, wifi_password);
+
+    return wifi_ssid[0] != 0;
+}
+
+static void app_task(void *pvArg)
+{
+    bool ap_mode = false;
+
+    gpio_install_isr_service(0);
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    event_queue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(app_event_t));
+
+    network_init("ai-camera", wifi_connection_callback);
+
+    if (load_wifi_creds()) {
+        const char *p_ssid = system_config_get_value(SYSTEM_CONFIG_WIFI_SSID);
+        const char *p_password = system_config_get_value(SYSTEM_CONFIG_WIFI_PASSWORD);
+        ESP_LOGI(TAG, "Starting in STA mode, connecting to %s", p_ssid);
+        network_sta_mode(p_ssid, p_password);
+        ap_mode = false;
+    } else {
+        ESP_LOGI(TAG, "No STA config saved, starting in AP mode");
+        network_ap_mode();
+        app_httpd_start();
+        ap_mode = true;
+    }
+
+    bsp_init(button_callback);
+    pir_init(pir_motion_callback, NULL);
+
+    ai_camera_init(BSP_I2C_BUS_ID);
+    ai_camera_start(AI_CAMERA_PIPELINE_DISCARD, NULL, NULL);
+
+    while (1) {
+        app_event_t event = APP_EVENT_MAX;
+        xQueueReceive(event_queue, &event, portMAX_DELAY);
+        switch (event) {
+        case APP_EVENT_WIFI_CONNECTED:
+            if (!app_httpd_is_running()) {
+                app_httpd_start();
+            }
+            break;
+        case APP_EVENT_PIR_MOTION_DETECTED:
+            ESP_LOGI(TAG, "Motion detected");
+            break;
+        case APP_EVENT_BUTTON_PRESSED:
+            if (ap_mode) {
+                const char *p_ssid = system_config_get_value(SYSTEM_CONFIG_WIFI_SSID);
+                const char *p_password = system_config_get_value(SYSTEM_CONFIG_WIFI_PASSWORD);
+                if (p_ssid != NULL && p_ssid[0] != 0) {
+                    ESP_LOGI(TAG, "Switching to STA mode");
+                    app_httpd_stop();
+                    network_sta_mode(p_ssid, p_password);
+                    ap_mode = false;
+                } else {
+                    ESP_LOGW(TAG, "Wifi creds unavailable, ignoring button press");
+                }
+            } else {
+                ESP_LOGI(TAG, "Switching to AP mode");
+                app_httpd_stop();
+                network_ap_mode();
+                app_httpd_start();
+                ap_mode = true;
+            }
+            break;
+        default:
+            break;
+        }
+    }
 }

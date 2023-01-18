@@ -1,10 +1,14 @@
 #include "bsp.h"
 
+#include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "driver/temperature_sensor.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
 
 #include "esp_log.h"
 
@@ -16,18 +20,34 @@
 #define I2C_SDA_PIN 13
 #define I2C_SCL_PIN 3
 
+#define BUTTON_DEBOUNCE_TIME_MS 50
+#define BUTTON_PIN              41
+
 #define TAG "bsp"
 
 static adc_oneshot_unit_handle_t adc1_handle;
 static adc_cali_handle_t vbat_adc_cali_handle;
 static temperature_sensor_handle_t temp_sensor;
 
+static void (*button_cb)(void);
+static TimerHandle_t button_debounce_timer;
+static bool button_debounce_timer_started;
+
 static bool init_adc_calibration(adc_unit_t unit, adc_atten_t atten, adc_cali_handle_t *out_handle);
 static void init_vbat_adc(void);
+static void init_button(void);
 
-void bsp_init(void)
+static void button_isr(void *param);
+static void button_debounce_timer_handler(TimerHandle_t timer);
+
+void bsp_init(void (*usr_button_cb)(void))
 {
     ESP_ERROR_CHECK(i2c_driver_install(BSP_I2C_BUS_ID, I2C_MODE_MASTER, 0, 0, 0));
+
+    if (NULL != usr_button_cb) {
+        button_cb = usr_button_cb;
+        init_button();
+    }
 
     i2c_config_t conf = {
         .mode = I2C_MODE_MASTER,
@@ -117,4 +137,42 @@ static void init_vbat_adc(void)
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, BATT_DETECT_ADC_CHANNEL, &config));
 
     init_adc_calibration(ADC_UNIT_1, ADC_ATTEN_DB_11, &vbat_adc_cali_handle);
+}
+
+static void IRAM_ATTR button_isr(void *param)
+{
+    if (!button_debounce_timer_started) {
+        BaseType_t wakeup_needed = pdFALSE;
+        xTimerStartFromISR(button_debounce_timer, &wakeup_needed);
+        button_debounce_timer_started = true;
+        portYIELD_FROM_ISR(wakeup_needed);
+    }
+}
+
+static void button_debounce_timer_handler(TimerHandle_t timer)
+{
+    button_debounce_timer_started = false;
+    if (gpio_get_level(BUTTON_PIN) == 0) {
+        button_cb();
+    }
+}
+
+static void init_button(void)
+{
+    gpio_config_t io_conf = {};
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = (1UL << BUTTON_PIN);
+    io_conf.pull_down_en = 0;
+    io_conf.pull_up_en = 1;
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+    button_debounce_timer = xTimerCreate("DEBOUNCE", pdMS_TO_TICKS(BUTTON_DEBOUNCE_TIME_MS),
+                             pdFALSE, NULL, button_debounce_timer_handler);
+    if (gpio_get_level(BUTTON_PIN) == 0) {
+        xTimerStart(button_debounce_timer, portMAX_DELAY);
+        button_debounce_timer_started = true;
+    }
+
+    gpio_isr_handler_add(BUTTON_PIN, button_isr, NULL);
 }
