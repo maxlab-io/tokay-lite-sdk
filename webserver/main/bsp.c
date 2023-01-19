@@ -21,7 +21,8 @@
 #define I2C_SCL_PIN 3
 
 #define BUTTON_DEBOUNCE_TIME_MS 50
-#define BUTTON_PIN              41LLU
+//#define BUTTON_PIN              41LLU
+#define BUTTON_PIN              0
 
 #define TAG "bsp"
 
@@ -76,7 +77,9 @@ uint32_t bsp_read_vbat(void)
 void bsp_temp_sensor_read(float *p_out)
 {
     *p_out = 0;
+    ESP_ERROR_CHECK(temperature_sensor_enable(temp_sensor));
     ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, p_out));
+    ESP_ERROR_CHECK(temperature_sensor_disable(temp_sensor));
 }
 
 static bool init_adc_calibration(adc_unit_t unit, adc_atten_t atten, adc_cali_handle_t *out_handle)

@@ -1,5 +1,7 @@
 #include "main.h"
 
+#include <string.h>
+
 #include "esp_camera.h"
 #include "sensor.h"
 
@@ -80,7 +82,15 @@ config_type_t system_config_get_type(system_config_t config)
 
 void system_config_apply(void)
 {
-    // TODO
+    char curr_ssid[33] = { 0 };
+    char curr_password[64] = { 0 };
+    const char *new_ssid = system_config_get_value(SYSTEM_CONFIG_WIFI_SSID);
+    const char *new_password = system_config_get_value(SYSTEM_CONFIG_WIFI_PASSWORD);
+    network_get_credentials(curr_ssid, curr_password);
+    if (0 != strcmp(curr_ssid, new_ssid) || 0 != strcmp(curr_password, new_password)) {
+        ESP_LOGI(TAG, "Updating WiFi settings from %s to %s", curr_ssid, new_ssid);
+        app_send_event(APP_EVENT_NEW_WIFI_SETTINGS);
+    }
 }
 
 void app_send_event(app_event_t ev)
@@ -105,7 +115,8 @@ void system_config_process_json(const cJSON *p_settings)
                 ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
                 continue;
             }
-            system_config_set_value(config, &p_cfg_val->valuestring);
+            ESP_LOGI(TAG, "Set %d to %s", config, p_cfg_val->valuestring);
+            system_config_set_value(config, (const void *)p_cfg_val->valuestring);
             break;
         case CONFIG_TYPE_INT: {
             if (!cJSON_IsNumber(p_cfg_val)) {
@@ -113,7 +124,7 @@ void system_config_process_json(const cJSON *p_settings)
                 continue;
             }
             const int valueint = (int)p_cfg_val->valuedouble;
-            system_config_set_value(config, &valueint);
+            system_config_set_value(config, (const void *)valueint);
             break;
         }
         default:
@@ -176,7 +187,7 @@ static void app_task(void *pvArg)
     } else {
         ESP_LOGI(TAG, "No STA config saved, starting in AP mode");
         network_ap_mode();
-        app_httpd_start();
+        app_httpd_start(true);
         ap_mode = true;
     }
 
@@ -192,7 +203,7 @@ static void app_task(void *pvArg)
         switch (event) {
         case APP_EVENT_WIFI_CONNECTED:
             if (!app_httpd_is_running()) {
-                app_httpd_start();
+                app_httpd_start(false);
             }
             break;
         case APP_EVENT_PIR_MOTION_DETECTED:
@@ -214,10 +225,15 @@ static void app_task(void *pvArg)
                 ESP_LOGI(TAG, "Switching to AP mode");
                 app_httpd_stop();
                 network_ap_mode();
-                app_httpd_start();
+                app_httpd_start(true);
                 ap_mode = true;
             }
             break;
+        case APP_EVENT_NEW_WIFI_SETTINGS:
+            ESP_LOGI(TAG, "Reconnecting to the new AP");
+            app_httpd_stop();
+            network_sta_mode(system_config_get_value(SYSTEM_CONFIG_WIFI_SSID), system_config_get_value(SYSTEM_CONFIG_WIFI_PASSWORD));
+            ap_mode = false;
         default:
             break;
         }

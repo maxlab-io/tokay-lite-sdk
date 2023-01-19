@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
+#include "esp_heap_caps.h"
 
 #include "main.h"
 #include "bsp.h"
@@ -51,12 +52,20 @@ static void send_telemetry(void *arg);
 static esp_err_t ws_recv_frame(httpd_req_t *p_req, httpd_ws_frame_t *p_ws_pkt, uint8_t **p_buffer);
 
 extern const char index_html_start[] asm("_binary_index_html_start");
+extern const char wifi_setup_html_start[] asm("_binary_wifi_setup_html_start");
 
 static const httpd_uri_t handler_index = {
     .uri       = "/",
     .method    = HTTP_GET,
     .handler   = http_handler_get_static_page,
     .user_ctx  = (void *)index_html_start,
+};
+
+static const httpd_uri_t handler_wifi_setup = {
+    .uri       = "/",
+    .method    = HTTP_GET,
+    .handler   = http_handler_get_static_page,
+    .user_ctx  = (void *)wifi_setup_html_start,
 };
 
 static const httpd_uri_t handler_jpeg = {
@@ -105,7 +114,7 @@ static const httpd_uri_t handler_set_system_settings = {
     .uri       = "/settings/system",
     .method    = HTTP_POST,
     .handler   = http_handler_set_settings,
-    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_CAMERA,
+    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_SYSTEM,
 };
 
 static const httpd_uri_t handler_ws_telemetry = {
@@ -130,7 +139,7 @@ static struct {
     TimerHandle_t telemetry_timer;
 } app_httpd_ctx;
 
-void app_httpd_start(void)
+void app_httpd_start(bool wifi_setup)
 {
     if (NULL == app_httpd_ctx.telemetry_timer) {
         app_httpd_ctx.telemetry_timer = xTimerCreate("TELEMETRY", pdMS_TO_TICKS(TELEMETRY_UPDATE_PERIOD_MS),
@@ -144,15 +153,21 @@ void app_httpd_start(void)
     config.max_uri_handlers = 9;
     ESP_ERROR_CHECK(httpd_start(&app_httpd_ctx.http_server_handle, &config));
 
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_index));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_jpeg));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_yuv422));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_rgb565));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_camera_settings));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_system_settings));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_camera_settings));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_system_settings));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_ws_telemetry));
+    if (wifi_setup) {
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_wifi_setup));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_system_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_system_settings));
+    } else {
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_index));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_jpeg));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_yuv422));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_rgb565));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_camera_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_system_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_camera_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_system_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_ws_telemetry));
+    }
 
     // Run a separate httpd instance for JPEG streaming
     httpd_config_t streamer_config = HTTPD_DEFAULT_CONFIG();
@@ -425,8 +440,10 @@ static void send_telemetry(void *arg)
     cJSON_AddNumberToObject(p_root, "light", ai_camera_get_light_level());
     cJSON_AddNumberToObject(p_root, "motion", 0); // TODO: figure out how to report motion
     cJSON_AddNumberToObject(p_root, "ir", ai_camera_get_ir_state());
-    cJSON_AddNumberToObject(p_root, "temp", tsens_value);
+    cJSON_AddNumberToObject(p_root, "temp", (int)tsens_value);
     cJSON_AddNumberToObject(p_root, "vbat", bsp_read_vbat());
+    cJSON_AddNumberToObject(p_root, "dram", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(p_root, "psram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     char *p_response = cJSON_Print(p_root);
     if (NULL == p_response) {

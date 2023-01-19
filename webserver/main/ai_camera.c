@@ -262,7 +262,7 @@ const void *ai_camera_config_get_value(ai_camera_config_t config)
 
 int ai_camera_config_get_value_int(ai_camera_config_t config)
 {
-    return *(int *)config_get_value(&config_ctx, (int)config);
+    return (int)config_get_value(&config_ctx, (int)config);
 }
 
 void ai_camera_config_set_value(ai_camera_config_t config, const void *p_value)
@@ -272,7 +272,7 @@ void ai_camera_config_set_value(ai_camera_config_t config, const void *p_value)
 
 void ai_camera_config_set_value_int(ai_camera_config_t config, int value)
 {
-    config_set_value(&config_ctx, (int)config, &value);
+    config_set_value(&config_ctx, (int)config, (void *)value);
 }
 
 ai_camera_config_t ai_camera_config_get_by_name(const char *name)

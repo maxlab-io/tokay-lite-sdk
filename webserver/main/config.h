@@ -16,6 +16,7 @@ typedef struct {
     union {
         char *value_string;
         int   value_int;
+        void *value_pv;
     };
 } config_value_t;
 

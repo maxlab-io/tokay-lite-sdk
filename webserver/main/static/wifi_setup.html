@@ -1,0 +1,58 @@
+<html>
+  <head>
+    <link rel="icon" href="data:,">
+    <title>AI Camera WiFi setup</title>
+    <style>
+      div.grid_form {
+        display:grid;
+        grid-template-columns: max-content max-content;
+        grid-gap:5px;
+      }
+      div.grid_form label       { text-align:right; }
+      div.grid_form label:after { content: ":"; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <form id="settings_form">
+        <h2>Enter WiFi credentials</h2>
+        <div class="grid_form">
+          <label>SSID</label>
+          <input type="ssid" name="ssid" id="wifi_ssid" />
+          <label for="password">Password</label>
+          <input type="password" name="password" id="wifi_password"/>
+          <button id="save_settings" type="submit">Save settings</button>
+        </div>
+      </form>
+      <script>
+        function handle_save_settings(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const ssid = formData.get('ssid');
+            const password = formData.get('password');
+            const data = { 'wifi_ssid': ssid, 'wifi_password': password };
+            let xhr = new XMLHttpRequest();
+            xhr.open("POST", "/settings/system");
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.send(JSON.stringify(data));
+        }
+
+        function fetch_info(event) {
+            let xhr = new XMLHttpRequest();
+            xhr.open("GET", "/settings/system");
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.onload = () => {
+                document.querySelector('#wifi_ssid').text = JSON.parse(xhr.responseText).wifi_ssid;
+                document.querySelector('#wifi_password').text = JSON.parse(xhr.responseText).wifi_password;
+            }
+            xhr.send(null);
+        }
+
+        const settings_form = document.querySelector('#settings_form');
+        settings_form.addEventListener('submit', handle_save_settings);
+        window.addEventListener('load', fetch_info);
+      </script>
+    </div>
+  </body>
+</html>
