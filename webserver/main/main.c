@@ -96,7 +96,15 @@ void system_config_apply(void)
 void app_send_event(app_event_t ev)
 {
     BaseType_t xRet = xQueueSend(event_queue, &ev, 0);
-    assert(pdTRUE == xRet);
+    configASSERT(pdTRUE == xRet);
+}
+
+void app_send_event_from_isr(app_event_t ev)
+{
+    BaseType_t wakeup_needed = pdFALSE;
+    BaseType_t xRet = xQueueSendFromISR(event_queue, &ev, &wakeup_needed);
+    configASSERT(pdTRUE == xRet);
+    portYIELD_FROM_ISR(wakeup_needed);
 }
 
 void system_config_process_json(const cJSON *p_settings)
