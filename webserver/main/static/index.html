@@ -135,280 +135,301 @@
             }
         }
 
-        $('#imageSensorConfigForm').css('height', $(window).height()*0.65)
-        $('#statsRow').css('height', $(window).height()*0.2)
-        // TODO: generate the schema in FW dynamically from the list of properties
-        $('#imageSensorConfigForm').jsonForm({
-        schema: {
-            resolution: {
-                type: 'integer',
-                title: 'Resolution',
-                required: true,
-                enum: [
-                    "160", "320", "640", "800", "1600"
-                ],
-                default: "320"
-            },
-            contrast: {
-                type: 'integer',
-                title: 'Contrast',
-                required: true,
-                minimum: -2,
-                maximum: 2,
-                default: 0
-            },
-            brightness: {
-                type: 'integer',
-                title: 'Brigtness',
-                required: true,
-                minimum: -2,
-                maximum: 2,
-                default: 0
-            },
-            saturation: {
-                type: 'integer',
-                title: 'Saturation',
-                required: true,
-                minimum: -2,
-                maximum: 2,
-                default: 0
-            },
-            sharpness: {
-                type: 'integer',
-                title: 'Sharpness',
-                required: true,
-                minimum: -2,
-                maximum: 2,
-                default: 0
-            },
-            denoise: {
-                type: 'boolean',
-                title: 'Denoise',
-                required: true,
-                default: true
-            },
-            gainceiling: {
-                type: 'integer',
-                title: 'Gainceiling',
-                required: true,
-                minimum: 0,
-                maximum: 6,
-                default: 0
-            },
-            jpeg_quality: {
-                type: 'integer',
-                title: 'JPEG quality',
-                required: true,
-                minimum: 1,
-                maximum: 64,
-                default: 20
-            },
-            colorbar: {
-                type: 'boolean',
-                title: 'Colorbar',
-                required: true,
-                default: false
-            },
-            whitebal: {
-                type: 'boolean',
-                title: 'Enable AWB',
-                required: true,
-                default: true
-            },
-            gain_ctrl: {
-                type: 'boolean',
-                title: 'Enable AGC',
-                required: true,
-                default: true
-            },
-            exposure_ctrl: {
-                type: 'boolean',
-                title: 'Enable AEC',
-                required: true,
-                default: true
-            },
-            hmirror: {
-                type: 'boolean',
-                title: 'Enable horizontal mirroring',
-                required: true,
-                default: false
-            },
-            vflip: {
-                type: 'boolean',
-                title: 'Enable vertical flip',
-                required: true,
-                default: false
-            },
-            aec2: {
-                type: 'boolean',
-                title: 'Enable AEC2',
-                required: true,
-                default: false
-            },
-            awb_gain: {
-                type: 'integer',
-                title: 'AWB Gain',
-                required: true,
-                minimum: 0,
-                maximum: 255,
-                default: 0
-            },
-            agc_gain: {
-                type: 'integer',
-                title: 'AGC Gain',
-                required: true,
-                minimum: 0,
-                maximum: 255,
-                default: 0
-            },
-            aec: {
-                type: 'integer',
-                title: 'AEC value',
-                required: true,
-                minimum: 0,
-                maximum: 1200,
-                default: 600
-            },
-            special_effect: {
-                type: 'integer',
-                title: 'Special effect',
-                required: true,
-                minimum: 0,
-                maximum: 6,
-                default: 0
-            },
-            wb_mode: {
-                type: 'integer',
-                title: 'White Balance mode',
-                required: true,
-                minimum: 0,
-                maximum: 4,
-                default: 0
-            },
-            ae_level: {
-                type: 'integer',
-                title: 'AE level',
-                required: true,
-                minimum: -2,
-                maximum: 2,
-                default: 0
-            },
-            dcw: {
-                type: 'boolean',
-                title: 'DCW',
-                required: true,
-                default: true
-            },
-            bpc: {
-                type: 'boolean',
-                title: 'BPC',
-                required: true,
-                default: true
-            },
-            wpc: {
-                type: 'boolean',
-                title: 'WPC',
-                required: true,
-                default: true
-            },
-            raw_gma: {
-                type: 'boolean',
-                title: 'Raw GMA',
-                required: true,
-                default: true
-            },
-            lenc: {
-                type: 'boolean',
-                title: 'Lenc',
-                required: true,
-                default: true
-            },
-            xclk_freq: {
-                type: 'integer',
-                title: 'XCLK frequency',
-                required: true,
-                enum: [ 1e6, 2e6, 4e6, 8e6, 16e6, 10e6, 20e6 ],
-                default: 8e6
-            },
-            ir_mode: {
-                type: 'integer',
-                title: 'IR mode',
-                enum: [ "auto", "day", "night" ],
-                default: 0
-            },
-            ir_light_thresh_high: {
-                type: 'integer',
-                title: 'IR light thresh high',
-                minimum: 0,
-                maximum: 16000,
-                default: 120
-            },
-            ir_light_thresh_low: {
-                type: 'integer',
-                title: 'IR light thresh low',
-                minimum: 0,
-                maximum: 16000,
-                default: 100
-            },
-            ir_brightness: {
-                type: 'integer',
-                title: 'IR LEDs brightness',
-                minimum: 0,
-                maximum: 255,
-                default: 255
-            },
-        },
-        onSubmit: function (errors, values) {
-            if (errors) {
-            } else {
-                let xhr = new XMLHttpRequest();
-                xhr.open("POST", "/settings/camera");
-                xhr.setRequestHeader("Accept", "application/json");
-                xhr.setRequestHeader("Content-Type", "application/json");
-                xhr.send(JSON.stringify(values));
+        function fetchSettings(category, form) {
+            let xhr = new XMLHttpRequest();
+            xhr.open("GET", `/settings/${category}`);
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.onload = () => {
+                resp_json = JSON.parse(xhr.responseText);
+                for (let k in resp_json) {
+                    if (k in $(`#${form}`).elements) {
+                        $(`#${form}`).elements[k] = resp_json[k];
+                    }
+                }
             }
+            xhr.send(null);
         }
-        });
-
-        $('#systemConfigForm').jsonForm({
-        schema: {
-            pir_enabled: {
-                type: 'boolean',
-                title: 'PIR Enabled',
-                required: true,
-                default: true
-            },
-            wifi_ssid: {
-                type: 'string',
-                title: 'WIFI SSID',
-                required: false,
-                default: ""
-            },
-            wifi_password: {
-                type: 'string',
-                title: 'WIFI password',
-                required: false,
-                default: ""
-            },
-        },
-        onSubmit: function (errors, values) {
-            if (errors) {
-            } else {
-                let xhr = new XMLHttpRequest();
-                xhr.open("POST", "/settings/system");
-                xhr.setRequestHeader("Accept", "application/json");
-                xhr.setRequestHeader("Content-Type", "application/json");
-                xhr.send(JSON.stringify({'system_config': values}));
-            }
-        }
-        });
 
         $('#playStream').click(handlePlayStream);
         $('#getJPEG').click(handleGetJPEG);
         $('#getYUV422').click(handleGetYUV422);
         $('#getRGB565').click(handleGetRGB565);
 
-        window.addEventListener('load', openTelemetrySocket);
+        window.addEventListener('load', () => {
+            openTelemetrySocket();
+
+            $('#imageSensorConfigForm').css('height', $(window).height()*0.65)
+            $('#statsRow').css('height', $(window).height()*0.2)
+            // TODO: generate the schema in FW dynamically from the list of properties
+            $('#imageSensorConfigForm').jsonForm({
+            schema: {
+                resolution: {
+                    type: 'integer',
+                    title: 'Resolution',
+                    required: true,
+                    enum: [
+                        "160", "320", "640", "800", "1600"
+                    ],
+                    default: "320"
+                },
+                contrast: {
+                    type: 'integer',
+                    title: 'Contrast',
+                    required: true,
+                    minimum: -2,
+                    maximum: 2,
+                    default: 0
+                },
+                brightness: {
+                    type: 'integer',
+                    title: 'Brigtness',
+                    required: true,
+                    minimum: -2,
+                    maximum: 2,
+                    default: 0
+                },
+                saturation: {
+                    type: 'integer',
+                    title: 'Saturation',
+                    required: true,
+                    minimum: -2,
+                    maximum: 2,
+                    default: 0
+                },
+                sharpness: {
+                    type: 'integer',
+                    title: 'Sharpness',
+                    required: true,
+                    minimum: -2,
+                    maximum: 2,
+                    default: 0
+                },
+                denoise: {
+                    type: 'boolean',
+                    title: 'Denoise',
+                    required: true,
+                    default: true
+                },
+                gainceiling: {
+                    type: 'integer',
+                    title: 'Gainceiling',
+                    required: true,
+                    minimum: 0,
+                    maximum: 6,
+                    default: 0
+                },
+                jpeg_quality: {
+                    type: 'integer',
+                    title: 'JPEG quality',
+                    required: true,
+                    minimum: 1,
+                    maximum: 64,
+                    default: 20
+                },
+                colorbar: {
+                    type: 'boolean',
+                    title: 'Colorbar',
+                    required: true,
+                    default: false
+                },
+                whitebal: {
+                    type: 'boolean',
+                    title: 'Enable AWB',
+                    required: true,
+                    default: true
+                },
+                gain_ctrl: {
+                    type: 'boolean',
+                    title: 'Enable AGC',
+                    required: true,
+                    default: true
+                },
+                exposure_ctrl: {
+                    type: 'boolean',
+                    title: 'Enable AEC',
+                    required: true,
+                    default: true
+                },
+                hmirror: {
+                    type: 'boolean',
+                    title: 'Enable horizontal mirroring',
+                    required: true,
+                    default: false
+                },
+                vflip: {
+                    type: 'boolean',
+                    title: 'Enable vertical flip',
+                    required: true,
+                    default: false
+                },
+                aec2: {
+                    type: 'boolean',
+                    title: 'Enable AEC2',
+                    required: true,
+                    default: false
+                },
+                awb_gain: {
+                    type: 'integer',
+                    title: 'AWB Gain',
+                    required: true,
+                    minimum: 0,
+                    maximum: 255,
+                    default: 0
+                },
+                agc_gain: {
+                    type: 'integer',
+                    title: 'AGC Gain',
+                    required: true,
+                    minimum: 0,
+                    maximum: 255,
+                    default: 0
+                },
+                aec: {
+                    type: 'integer',
+                    title: 'AEC value',
+                    required: true,
+                    minimum: 0,
+                    maximum: 1200,
+                    default: 600
+                },
+                special_effect: {
+                    type: 'integer',
+                    title: 'Special effect',
+                    required: true,
+                    minimum: 0,
+                    maximum: 6,
+                    default: 0
+                },
+                wb_mode: {
+                    type: 'integer',
+                    title: 'White Balance mode',
+                    required: true,
+                    minimum: 0,
+                    maximum: 4,
+                    default: 0
+                },
+                ae_level: {
+                    type: 'integer',
+                    title: 'AE level',
+                    required: true,
+                    minimum: -2,
+                    maximum: 2,
+                    default: 0
+                },
+                dcw: {
+                    type: 'boolean',
+                    title: 'DCW',
+                    required: true,
+                    default: true
+                },
+                bpc: {
+                    type: 'boolean',
+                    title: 'BPC',
+                    required: true,
+                    default: true
+                },
+                wpc: {
+                    type: 'boolean',
+                    title: 'WPC',
+                    required: true,
+                    default: true
+                },
+                raw_gma: {
+                    type: 'boolean',
+                    title: 'Raw GMA',
+                    required: true,
+                    default: true
+                },
+                lenc: {
+                    type: 'boolean',
+                    title: 'Lenc',
+                    required: true,
+                    default: true
+                },
+                xclk_freq: {
+                    type: 'integer',
+                    title: 'XCLK frequency',
+                    required: true,
+                    enum: [ 1e6, 2e6, 4e6, 8e6, 16e6, 10e6, 20e6 ],
+                    default: 8e6
+                },
+                ir_mode: {
+                    type: 'integer',
+                    title: 'IR mode',
+                    enum: [ "auto", "day", "night" ],
+                    default: 0
+                },
+                ir_light_thresh_high: {
+                    type: 'integer',
+                    title: 'IR light thresh high',
+                    minimum: 0,
+                    maximum: 16000,
+                    default: 120
+                },
+                ir_light_thresh_low: {
+                    type: 'integer',
+                    title: 'IR light thresh low',
+                    minimum: 0,
+                    maximum: 16000,
+                    default: 100
+                },
+                ir_brightness: {
+                    type: 'integer',
+                    title: 'IR LEDs brightness',
+                    minimum: 0,
+                    maximum: 255,
+                    default: 255
+                },
+            },
+            onSubmit: function (errors, values) {
+                if (errors) {
+                } else {
+                    let xhr = new XMLHttpRequest();
+                    xhr.open("POST", "/settings/camera");
+                    xhr.setRequestHeader("Accept", "application/json");
+                    xhr.setRequestHeader("Content-Type", "application/json");
+                    xhr.send(JSON.stringify(values));
+                }
+            }
+            });
+
+            $('#systemConfigForm').jsonForm({
+            schema: {
+                pir_enabled: {
+                    type: 'boolean',
+                    title: 'PIR Enabled',
+                    required: true,
+                    default: true
+                },
+                wifi_ssid: {
+                    type: 'string',
+                    title: 'WIFI SSID',
+                    required: false,
+                    default: ""
+                },
+                wifi_password: {
+                    type: 'string',
+                    title: 'WIFI password',
+                    required: false,
+                    default: ""
+                },
+            },
+            onSubmit: function (errors, values) {
+                if (errors) {
+                } else {
+                    let xhr = new XMLHttpRequest();
+                    xhr.open("POST", "/settings/system");
+                    xhr.setRequestHeader("Accept", "application/json");
+                    xhr.setRequestHeader("Content-Type", "application/json");
+                    xhr.send(JSON.stringify(values));
+                }
+            }
+            });
+
+            fetchSettings('system', 'systemConfigForm')
+            fetchSettings('camera', 'imageSensorConfigForm')
+        });
     </script>
   </body>
 </html>

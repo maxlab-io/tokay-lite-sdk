@@ -249,10 +249,10 @@ static esp_err_t http_handler_get_settings(httpd_req_t *req)
             const char *p_name = ai_camera_config_get_name(i);
             switch (ai_camera_config_get_type(i)) {
             case CONFIG_TYPE_STRING:
-                cJSON_AddStringToObject(p_root, p_name, *(const char **)ai_camera_config_get_value(i));
+                cJSON_AddStringToObject(p_root, p_name, (const char *)ai_camera_config_get_value(i));
                 break;
             case CONFIG_TYPE_INT:
-                cJSON_AddNumberToObject(p_root, p_name, *(int *)ai_camera_config_get_value(i));
+                cJSON_AddNumberToObject(p_root, p_name, (int)ai_camera_config_get_value(i));
                 break;
             default:
                 assert(0);
@@ -264,10 +264,10 @@ static esp_err_t http_handler_get_settings(httpd_req_t *req)
             const char *p_name = system_config_get_name(i);
             switch (system_config_get_type(i)) {
             case CONFIG_TYPE_STRING:
-                cJSON_AddStringToObject(p_root, p_name, *(const char **)system_config_get_value(i));
+                cJSON_AddStringToObject(p_root, p_name, (const char *)system_config_get_value(i));
                 break;
             case CONFIG_TYPE_INT:
-                cJSON_AddNumberToObject(p_root, p_name, *(int *)system_config_get_value(i));
+                cJSON_AddNumberToObject(p_root, p_name, (int)system_config_get_value(i));
                 break;
             default:
                 assert(0);
