@@ -143,8 +143,13 @@
             xhr.onload = () => {
                 resp_json = JSON.parse(xhr.responseText);
                 for (let k in resp_json) {
-                    if (k in $(`#${form}`).elements) {
-                        $(`#${form}`).elements[k] = resp_json[k];
+                    if ($(`#${form} input[name=${k}]`).length > 0) {
+                        if (['number', 'text', 'password'].indexOf($(`#${form} input[name=${k}]`).attr('type')) > -1) {
+                            $(`#${form} input[name=${k}]`).val(resp_json[k]);
+                            console.log("val is " + $(`#${form} input[name=${k}]`).val());
+                        } else if ($(`#${form} input[name=${k}]`).attr('type') == 'checkbox') {
+                            $(`#${form} input[name=${k}]`).prop('checked', 0 != resp_json[k]);
+                        }
                     }
                 }
             }
@@ -409,7 +414,7 @@
                     default: ""
                 },
                 wifi_password: {
-                    type: 'string',
+                    type: 'password',
                     title: 'WIFI password',
                     required: false,
                     default: ""
