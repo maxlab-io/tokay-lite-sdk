@@ -110,7 +110,6 @@
       function openTelemetrySocket() {
             let socket = new WebSocket("ws://" + location.host + "/telemetry");
             socket.onmessage = function(event) {
-                console.log(`Telemetry message received: ${event.data}`)
                 const resp_json = JSON.parse(event.data);
                 for (let k in resp_json) {
                     $(`#${k}Val`).html(resp_json[k]);

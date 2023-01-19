@@ -1,6 +1,7 @@
 #include "ai_camera.h"
 
 #include <string.h>
+#include <math.h>
 
 #include "nvs_flash.h"
 #include "esp_log.h"
@@ -42,6 +43,9 @@
 
 #define CAMERA_THREAD_STACK_SIZE (4096)
 #define CAMERA_THREAD_PRIORITY   5
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define TAG "ai_camera"
 
@@ -232,12 +236,32 @@ camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
     if (!camera_ctx.running) {
         return NULL;
     }
-    return NULL;
+    const uint32_t seed = xTaskGetTickCount();
+    static uint8_t *p_raw = NULL;
+    const uint32_t w = 320;
+    const uint32_t h = 240;
+    if (NULL == p_raw) {
+        p_raw = malloc(w * h);
+    }
+    for (int i = 0; i < h; i++) {
+        for (int j = 0; j < w; j++) {
+            const uint32_t val = 128 + 127 * (sinf((seed % 100 + j)/5.f) * sinf((seed % 100 + i)/5.f));
+            p_raw[i * w + j] = MAX(MIN(val, 255), 0);
+        }
+    }
+    camera_fb_t *p_mock = calloc(1, sizeof(camera_fb_t));
+    p_mock->width = w;
+    p_mock->height = h;
+    p_mock->format = PIXFORMAT_JPEG;
+    fmt2jpg(p_raw, w * h, w, h, PIXFORMAT_GRAYSCALE, 30, &p_mock->buf, &p_mock->len);
+    return p_mock;
 }
 
 void ai_camera_fb_return(camera_fb_t *p_fb)
 {
-    esp_camera_fb_return(p_fb);
+    free(p_fb->buf);
+    free(p_fb);
+    //esp_camera_fb_return(p_fb);
 }
 
 ai_camera_ir_state_t ai_camera_get_ir_state(void)

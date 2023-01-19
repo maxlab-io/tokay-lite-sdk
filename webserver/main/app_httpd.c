@@ -130,12 +130,12 @@ static const httpd_uri_t handler_stream = {
     .method    = HTTP_GET,
     .handler   = http_handler_get_stream,
     .user_ctx  = NULL,
+    .is_websocket = true,
 };
 
 static struct {
     bool is_running;
     httpd_handle_t http_server_handle;
-    httpd_handle_t streaming_server_handle;
     TimerHandle_t telemetry_timer;
 } app_httpd_ctx;
 
@@ -150,7 +150,7 @@ void app_httpd_start(bool wifi_setup)
     config.server_port = 80;
     config.lru_purge_enable = true;
     config.core_id = 0;
-    config.max_uri_handlers = 9;
+    config.max_uri_handlers = 10;
     ESP_ERROR_CHECK(httpd_start(&app_httpd_ctx.http_server_handle, &config));
 
     if (wifi_setup) {
@@ -167,25 +167,15 @@ void app_httpd_start(bool wifi_setup)
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_camera_settings));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_system_settings));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_ws_telemetry));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_stream));
     }
 
-    // Run a separate httpd instance for JPEG streaming
-    httpd_config_t streamer_config = HTTPD_DEFAULT_CONFIG();
-    streamer_config.uri_match_fn = NULL;
-    streamer_config.server_port = STREAMING_HTTP_SERVER_PORT;
-    streamer_config.lru_purge_enable = true;
-    streamer_config.core_id = 0;
-    streamer_config.max_uri_handlers = 1;
-    streamer_config.ctrl_port++; // avoid conflicts with the main HTTP server
-    ESP_ERROR_CHECK(httpd_start(&app_httpd_ctx.streaming_server_handle, &streamer_config));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.streaming_server_handle, &handler_stream));
     app_httpd_ctx.is_running = true;
 }
 
 void app_httpd_stop(void)
 {
     httpd_stop(app_httpd_ctx.http_server_handle);
-    httpd_stop(app_httpd_ctx.streaming_server_handle);
     app_httpd_ctx.is_running = false;
 }
 
