@@ -49,6 +49,8 @@
 
 #define TAG "ai_camera"
 
+//#define ENABLE_CAMERA_MOCK 1
+
 static config_desc_t config_desc[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_RESOLUTION] = { "resolution", CONFIG_TYPE_INT },
     [AI_CAMERA_CONFIG_CONTRAST ] = { "contrast", CONFIG_TYPE_INT },
@@ -494,8 +496,13 @@ static void camera_thread_entry(void *pvParam)
         if (commands & (1 << CAMERA_CMD_GET_RGB565)) {
             // TODO
         }
-        const ai_camera_pipeline_t current_pipeline = camera_ctx.pipeline;
         camera_fb_t *p_frame = camera_get_frame();
+        if (NULL == p_frame) {
+            ESP_LOGE(TAG, "Failed to get frame");
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+        const ai_camera_pipeline_t current_pipeline = camera_ctx.pipeline;
         if (AI_CAMERA_PIPELINE_DISCARD != current_pipeline) {
             if (NULL != camera_ctx.p_frame_cb) {
                 camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, true, camera_ctx.p_frame_cb_ctx);
@@ -510,6 +517,7 @@ static camera_fb_t *camera_get_frame(void)
     if (!camera_ctx.running) {
         return NULL;
     }
+#if ENABLE_CAMERA_MOCK
     const uint32_t seed = xTaskGetTickCount();
     static uint8_t *p_buf = NULL;
     static size_t len = 0;
@@ -534,6 +542,9 @@ static camera_fb_t *camera_get_frame(void)
     p_mock->format = PIXFORMAT_JPEG;
     vTaskDelay(pdMS_TO_TICKS(100));
     return p_mock;
+#else
+    return esp_camera_fb_get();
+#endif
 }
 
 static void camera_thread_sleep(void)
