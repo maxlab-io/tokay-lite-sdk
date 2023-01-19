@@ -1,6 +1,7 @@
 #include "app_httpd.h"
 
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
 #include "esp_heap_caps.h"
@@ -41,10 +42,13 @@ typedef enum {
 
 static esp_err_t http_handler_get_static_page(httpd_req_t *req);
 static esp_err_t http_handler_get_picture(httpd_req_t *req);
-static esp_err_t http_handler_get_stream(httpd_req_t *req);
 static esp_err_t http_handler_get_settings(httpd_req_t *req);
 static esp_err_t http_handler_set_settings(httpd_req_t *req);
 static esp_err_t http_handler_ws_telemetry(httpd_req_t *req);
+
+static esp_err_t http_handler_get_stream(httpd_req_t *req);
+static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size,
+        bool start_of_frame, void *p_ctx);
 
 static void telemetry_timer_cb(TimerHandle_t handle);
 static void send_telemetry(void *arg);
@@ -372,43 +376,6 @@ static esp_err_t http_handler_ws_telemetry(httpd_req_t *req)
     return ESP_OK;
 }
 
-static esp_err_t http_handler_get_stream(httpd_req_t *req)
-{
-    esp_err_t ret = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    char part_buf[64];
-
-    while (true) {
-        camera_fb_t *p_fb = ai_camera_get_frame(PIXFORMAT_JPEG, pdMS_TO_TICKS(500));
-        if (NULL == p_fb) {
-            httpd_resp_set_status(req, "500 Capture timeout");
-            httpd_resp_send(req, NULL, 0);
-            return ESP_OK;
-        }
-
-        ret = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
-        if (ESP_OK == ret) {
-            const int len = snprintf(part_buf, sizeof(part_buf), _STREAM_PART, p_fb->len);
-            if (len >= 0 && len <= sizeof(part_buf)) {
-                ret = httpd_resp_send_chunk(req, (const char *)part_buf, len);
-            } else {
-                ret = ESP_FAIL;
-            }
-        }
-        if (ESP_OK == ret) {
-            ret = httpd_resp_send_chunk(req, (const char *)p_fb->buf, p_fb->len);
-        }
-        ai_camera_fb_return(p_fb);
-        if (ESP_OK != ret) {
-            return ret;
-        }
-    }
-    return ESP_OK;
-}
-
 static void telemetry_timer_cb(TimerHandle_t handle)
 {
     httpd_queue_work(app_httpd_ctx.http_server_handle, send_telemetry, pvTimerGetTimerID(handle));
@@ -454,4 +421,59 @@ static void send_telemetry(void *arg)
 fail:
     cJSON_Delete(p_root);
     ESP_LOGE(TAG, "Failed to generate telemetry JSON");
+}
+
+static esp_err_t http_handler_get_stream(httpd_req_t *req)
+{
+    if (req->method == HTTP_GET) {
+        ESP_LOGI(TAG, "Stream andshake done, a new WS connection was opened");
+        ai_camera_stop();
+        ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, camera_frame_cb, (void *)httpd_req_to_sockfd(req));
+    }
+
+    return ESP_OK;
+}
+
+static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size,
+                                     bool start_of_frame, void *p_ctx)
+{
+    const int fd = (int)p_ctx;
+
+    cJSON *p_root = cJSON_CreateObject();
+    if (NULL == p_root) {
+        goto fail;
+    }
+
+    // TODO: fill in metadata + add results from CNN
+    cJSON_AddNumberToObject(p_root, "ts", esp_timer_get_time());
+    cJSON_AddNumberToObject(p_root, "width", 0);
+    cJSON_AddNumberToObject(p_root, "height", 0);
+
+    char *p_response = cJSON_Print(p_root);
+    if (NULL == p_response) {
+        goto fail;
+    }
+    cJSON_Delete(p_root);
+
+    httpd_ws_frame_t ws_pkt = { 0 };
+    ws_pkt.payload = (uint8_t*)p_response;
+    ws_pkt.len = strlen(p_response);
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
+    if (ESP_OK != ret) {
+        ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
+    }
+    free(p_response);
+    memset(&ws_pkt, 0, sizeof(ws_pkt));
+    ws_pkt.payload = (uint8_t *)p_data;
+    ws_pkt.len = size;
+    ws_pkt.type = HTTPD_WS_TYPE_BINARY;
+    ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
+    if (ESP_OK != ret) {
+        ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
+    }
+    return;
+fail:
+    cJSON_Delete(p_root);
+    ESP_LOGE(TAG, "Failed to generate frame meta JSON");
 }

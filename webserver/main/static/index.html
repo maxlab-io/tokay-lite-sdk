@@ -78,7 +78,20 @@
     <script type="text/javascript">
 
         function handlePlayStream() {
-            $('#viewport').attr('src', '/stream');
+            let stream_metadata = null;
+            let socket = new WebSocket("ws://" + location.host + "/stream");
+            socket.binaryType = "blob";
+            socket.onmessage = (event) => {
+                if (typeof event.data === "string") {
+                    console.log(event.data)
+                    stream_metadata = JSON.parse(event.data);
+                } else {
+                    var image_url = window.URL.createObjectURL(event.data);
+                    $('#viewport').attr('src', image_url)
+                }
+            }
+            socket.onopen = function(event) {
+            }
         }
 
         function handleStopStream() {

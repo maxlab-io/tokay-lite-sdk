@@ -162,6 +162,8 @@ typedef enum {
     CAMERA_CMD_GET_JPEG,
     CAMERA_CMD_GET_YUV422,
     CAMERA_CMD_GET_RGB565,
+    CAMERA_CMD_START,
+    CAMERA_CMD_STOP,
 
     CAMERA_CMD_MAX = 32
 } camera_cmd_t;
@@ -190,6 +192,8 @@ static void ir_mode_night(void);
 static void update_ir_mode(void);
 static void ir_mode_timer_handler(TimerHandle_t timer);
 static void camera_thread_entry(void *pvParam);
+static camera_fb_t *camera_get_frame(void);
+static void camera_thread_sleep(void);
 
 void ai_camera_init(int i2c_bus_id)
 {
@@ -209,6 +213,11 @@ void ai_camera_init(int i2c_bus_id)
                              pdFALSE, NULL, ir_mode_timer_handler);
 
     camera_config.sccb_i2c_port = i2c_bus_id;
+
+    camera_ctx.camera_thread_commands = xEventGroupCreate();
+    xTaskCreatePinnedToCore(camera_thread_entry, "AICAM", CAMERA_THREAD_STACK_SIZE,
+            NULL, CAMERA_THREAD_PRIORITY, &camera_ctx.camera_thread, 0);
+    configASSERT(&camera_ctx.camera_thread);
 }
 
 void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_cb, void *p_ctx)
@@ -218,50 +227,34 @@ void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_cb, v
     camera_ctx.pipeline = pipeline;
     camera_ctx.p_frame_cb = p_cb;
     camera_ctx.p_frame_cb_ctx = p_ctx;
-    camera_ctx.camera_thread_commands = xEventGroupCreate();
-    xTaskCreatePinnedToCore(camera_thread_entry, "AICAM", CAMERA_THREAD_STACK_SIZE,
-            NULL, CAMERA_THREAD_PRIORITY, &camera_ctx.camera_thread, 0);
-    configASSERT(&camera_ctx.camera_thread);
     update_ir_mode();
+    xEventGroupClearBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
+    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
 }
 
 void ai_camera_stop(void)
 {
-    esp_camera_deinit();
+    xEventGroupClearBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
+    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
+    xTimerStop(camera_ctx.ir_mode_timer, portMAX_DELAY); // not reliable, but good for now
     camera_ctx.running = false;
 }
 
 camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
 {
-    if (!camera_ctx.running) {
-        return NULL;
-    }
-    const uint32_t seed = xTaskGetTickCount();
-    static uint8_t *p_raw = NULL;
-    const uint32_t w = 320;
-    const uint32_t h = 240;
-    if (NULL == p_raw) {
-        p_raw = malloc(w * h);
-    }
-    for (int i = 0; i < h; i++) {
-        for (int j = 0; j < w; j++) {
-            const uint32_t val = 128 + 127 * (sinf((seed % 100 + j)/5.f) * sinf((seed % 100 + i)/5.f));
-            p_raw[i * w + j] = MAX(MIN(val, 255), 0);
-        }
-    }
-    camera_fb_t *p_mock = calloc(1, sizeof(camera_fb_t));
-    p_mock->width = w;
-    p_mock->height = h;
-    p_mock->format = PIXFORMAT_JPEG;
-    fmt2jpg(p_raw, w * h, w, h, PIXFORMAT_GRAYSCALE, 30, &p_mock->buf, &p_mock->len);
-    return p_mock;
+    return NULL;
 }
 
 void ai_camera_fb_return(camera_fb_t *p_fb)
 {
-    free(p_fb->buf);
+    //free(p_fb->buf);
     free(p_fb);
     //esp_camera_fb_return(p_fb);
+}
+
+void ai_camera_get_stats(ai_camera_stats_t *p_stats_out)
+{
+
 }
 
 ai_camera_ir_state_t ai_camera_get_ir_state(void)
@@ -477,12 +470,18 @@ static void camera_thread_entry(void *pvParam)
     esp_err_t err = esp_camera_init(&camera_config);
     if (ESP_OK != err) {
         ESP_LOGE(TAG, "Camera initialization failed: %s", esp_err_to_name(err));
+        /*
         while (1) {
             vTaskDelay(1000);
         }
+        */
     }
+    camera_thread_sleep(); // Wait for ai_camera_start();
     while (1) {
         const uint32_t commands = xEventGroupGetBits(camera_ctx.camera_thread_commands);
+        if (commands & (1 << CAMERA_CMD_STOP)) {
+            camera_thread_sleep();
+        }
         if (commands & (1 << CAMERA_CMD_APPLY_SETTINGS)) {
             // TODO
         }
@@ -495,5 +494,50 @@ static void camera_thread_entry(void *pvParam)
         if (commands & (1 << CAMERA_CMD_GET_RGB565)) {
             // TODO
         }
+        const ai_camera_pipeline_t current_pipeline = camera_ctx.pipeline;
+        camera_fb_t *p_frame = camera_get_frame();
+        if (AI_CAMERA_PIPELINE_DISCARD != current_pipeline) {
+            if (NULL != camera_ctx.p_frame_cb) {
+                camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, true, camera_ctx.p_frame_cb_ctx);
+            }
+        }
+        ai_camera_fb_return(p_frame);
     }
+}
+
+static camera_fb_t *camera_get_frame(void)
+{
+    if (!camera_ctx.running) {
+        return NULL;
+    }
+    const uint32_t seed = xTaskGetTickCount();
+    static uint8_t *p_buf = NULL;
+    static size_t len = 0;
+    const uint32_t w = 160;
+    const uint32_t h = 120;
+    if (NULL == p_buf) {
+        uint8_t *p_raw = malloc(w * h);
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                const uint32_t val = 128 + 127 * (sinf((seed % 100 + j)/5.f) * sinf((seed % 100 + i)/5.f));
+                p_raw[i * w + j] = MAX(MIN(val, 255), 0);
+            }
+        }
+        fmt2jpg(p_raw, w * h, w, h, PIXFORMAT_GRAYSCALE, 30, &p_buf, &len);
+        free(p_raw);
+    }
+    camera_fb_t *p_mock = calloc(1, sizeof(camera_fb_t));
+    p_mock->buf = p_buf;
+    p_mock->len = len;
+    p_mock->width = w;
+    p_mock->height = h;
+    p_mock->format = PIXFORMAT_JPEG;
+    vTaskDelay(pdMS_TO_TICKS(30));
+    return p_mock;
+}
+
+static void camera_thread_sleep(void)
+{
+    xEventGroupWaitBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START),
+            pdTRUE, pdTRUE, portMAX_DELAY);
 }
