@@ -83,7 +83,6 @@
             socket.binaryType = "blob";
             socket.onmessage = (event) => {
                 if (typeof event.data === "string") {
-                    console.log(event.data)
                     stream_metadata = JSON.parse(event.data);
                 } else {
                     var image_url = window.URL.createObjectURL(event.data);
@@ -91,6 +90,10 @@
                 }
             }
             socket.onopen = function(event) {
+                $('#stopStream').click(() => {
+                    socket.close()
+                    $('#viewport').attr('src', '/image.jpg');
+                });
             }
         }
 
@@ -401,7 +404,6 @@
         });
 
         $('#playStream').click(handlePlayStream);
-        $('#stopStream').click(handleStopStream);
         $('#getJPEG').click(handleGetJPEG);
         $('#getYUV422').click(handleGetYUV422);
         $('#getRGB565').click(handleGetRGB565);

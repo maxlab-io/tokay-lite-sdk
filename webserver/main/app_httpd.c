@@ -441,7 +441,10 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
 
     cJSON *p_root = cJSON_CreateObject();
     if (NULL == p_root) {
-        goto fail;
+        ESP_LOGE(TAG, "Failed to generate frame meta JSON");
+        cJSON_Delete(p_root);
+        ai_camera_stop();
+        return;
     }
 
     // TODO: fill in metadata + add results from CNN
@@ -451,7 +454,10 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
 
     char *p_response = cJSON_Print(p_root);
     if (NULL == p_response) {
-        goto fail;
+        ESP_LOGE(TAG, "Failed to generate frame meta JSON");
+        cJSON_Delete(p_root);
+        ai_camera_stop();
+        return;
     }
     cJSON_Delete(p_root);
 
@@ -462,6 +468,8 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
     esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
+        ai_camera_stop();
+        return;
     }
     free(p_response);
     memset(&ws_pkt, 0, sizeof(ws_pkt));
@@ -471,9 +479,6 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
     ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
+        ai_camera_stop();
     }
-    return;
-fail:
-    cJSON_Delete(p_root);
-    ESP_LOGE(TAG, "Failed to generate frame meta JSON");
 }

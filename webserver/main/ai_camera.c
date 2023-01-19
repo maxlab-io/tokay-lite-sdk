@@ -532,7 +532,7 @@ static camera_fb_t *camera_get_frame(void)
     p_mock->width = w;
     p_mock->height = h;
     p_mock->format = PIXFORMAT_JPEG;
-    vTaskDelay(pdMS_TO_TICKS(30));
+    vTaskDelay(pdMS_TO_TICKS(100));
     return p_mock;
 }
 
