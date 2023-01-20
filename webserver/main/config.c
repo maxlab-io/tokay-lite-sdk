@@ -1,7 +1,5 @@
 #include "config.h"
 
-#include "esp_log.h"
-
 #include <string.h>
 
 const char *config_get_name(config_ctx_t *p_ctx, int config_var)
@@ -33,7 +31,6 @@ void config_set_value(config_ctx_t *p_ctx, int config_var, const void *p_value)
     case CONFIG_TYPE_STRING:
         free(p_ctx->p_values[config_var].value_string);
         p_ctx->p_values[config_var].value_string = strdup(p_value);
-        ESP_LOGI("asd", "Set %d to %s", config_var, p_ctx->p_values[config_var].value_string);
         break;
     case CONFIG_TYPE_INT:
         p_ctx->p_values[config_var].value_int = (int)p_value;
