@@ -14,6 +14,7 @@
 
 #include "config.h"
 #include "light_sensor.h"
+#include "ai_pipeline.h"
 
 #define CAM_PIN_PWDN   9
 #define CAM_PIN_RESET  11
@@ -467,11 +468,6 @@ static void camera_thread_entry(void *pvParam)
     esp_err_t err = esp_camera_init(&camera_config);
     if (ESP_OK != err) {
         ESP_LOGE(TAG, "Camera initialization failed: %s", esp_err_to_name(err));
-        /*
-        while (1) {
-            vTaskDelay(1000);
-        }
-        */
     }
     camera_thread_sleep(); // Wait for ai_camera_start();
     while (1) {
@@ -499,6 +495,11 @@ static void camera_thread_entry(void *pvParam)
         }
         const ai_camera_pipeline_t current_pipeline = camera_ctx.pipeline;
         if (AI_CAMERA_PIPELINE_DISCARD != current_pipeline) {
+            if (AI_CAMERA_PIPELINE_CNN == current_pipeline) {
+                ai_pipeline_start(p_frame->buf, p_frame->len);
+                ai_pipeline_wait(pdMS_TO_TICKS(600));
+                ai_pipeline_get_results();
+            }
             if (NULL != camera_ctx.p_frame_cb) {
                 camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, true, camera_ctx.p_frame_cb_ctx);
             }

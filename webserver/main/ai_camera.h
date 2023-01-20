@@ -67,9 +67,12 @@ typedef enum {
 } ai_camera_pipeline_t;
 
 typedef struct {
-    uint32_t frame_time_ms;
-    uint32_t cnn_processing_ms;
-    uint32_t codec_processing_ms;
+    struct {
+        uint32_t frame_time_ms;
+        uint32_t cnn_processing_ms;
+        uint32_t codec_processing_ms;
+    } cumulative;
+    uint32_t num_frames_collected;
 } ai_camera_stats_t;
 
 typedef void (*ai_camera_frame_cb_t)(pixformat_t format, const uint8_t *p_data, uint32_t size,

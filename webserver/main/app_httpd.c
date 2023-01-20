@@ -439,6 +439,16 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
 {
     const int fd = (int)p_ctx;
 
+    httpd_ws_frame_t ws_pkt = { 0 };
+    ws_pkt.payload = (uint8_t *)p_data;
+    ws_pkt.len = size;
+    ws_pkt.type = HTTPD_WS_TYPE_BINARY;
+    esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
+    if (ESP_OK != ret) {
+        ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
+        ai_camera_stop();
+    }
+
     cJSON *p_root = cJSON_CreateObject();
     if (NULL == p_root) {
         ESP_LOGE(TAG, "Failed to generate frame meta JSON");
@@ -461,24 +471,15 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
     }
     cJSON_Delete(p_root);
 
-    httpd_ws_frame_t ws_pkt = { 0 };
+    memset(&ws_pkt, 0, sizeof(ws_pkt));
     ws_pkt.payload = (uint8_t*)p_response;
     ws_pkt.len = strlen(p_response);
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-    esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
+    ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
         ai_camera_stop();
         return;
     }
     free(p_response);
-    memset(&ws_pkt, 0, sizeof(ws_pkt));
-    ws_pkt.payload = (uint8_t *)p_data;
-    ws_pkt.len = size;
-    ws_pkt.type = HTTPD_WS_TYPE_BINARY;
-    ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
-    if (ESP_OK != ret) {
-        ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
-        ai_camera_stop();
-    }
 }
