@@ -203,7 +203,6 @@ static void app_task(void *pvArg)
     pir_init(pir_motion_callback, NULL);
 
     ai_camera_init(BSP_I2C_BUS_ID);
-    ai_camera_start(AI_CAMERA_PIPELINE_DISCARD, NULL, NULL);
 
     while (1) {
         app_event_t event = APP_EVENT_MAX;

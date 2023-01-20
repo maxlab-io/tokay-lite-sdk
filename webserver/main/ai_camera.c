@@ -37,7 +37,7 @@
 
 #define IRCUT_ENERGIZE_DURATION_US (60 * 1000)
 
-#define XCLK_DEFAULT_FREQ_HZ 16000000
+#define XCLK_DEFAULT_FREQ_HZ 15000000
 
 #define IR_MODE_TIMER_PERIOD_MS 1000
 
@@ -48,8 +48,6 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define TAG "ai_camera"
-
-//#define ENABLE_CAMERA_MOCK 1
 
 static config_desc_t config_desc[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_RESOLUTION] = { "resolution", CONFIG_TYPE_INT },
@@ -112,7 +110,7 @@ static int default_config[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_WPC] = 0,
     [AI_CAMERA_CONFIG_RAW_GMA] = 0,
     [AI_CAMERA_CONFIG_LENC] = 0,
-    [AI_CAMERA_CONFIG_XCLK_FREQ] = 8000000,
+    [AI_CAMERA_CONFIG_XCLK_FREQ] = XCLK_DEFAULT_FREQ_HZ,
     [AI_CAMERA_CONFIG_IR_MODE] = AI_CAMERA_IR_MODE_AUTO,
     [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = 100,
     [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = 50,
@@ -152,10 +150,10 @@ static camera_config_t camera_config = {
     .pixel_format = PIXFORMAT_JPEG,
     .frame_size = FRAMESIZE_UXGA,
 
-    .jpeg_quality = 50,
+    .jpeg_quality = 30,
     .fb_count = 1,
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
-    .fb_location = CAMERA_FB_IN_DRAM,
+    .fb_location = CAMERA_FB_IN_PSRAM,
     //.fb_size = 1024 * 120, // TODO: port to esp32-camera upstream
 };
 
@@ -211,12 +209,12 @@ void ai_camera_init(int i2c_bus_id)
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
 
+    camera_config.sccb_i2c_port = i2c_bus_id;
+    camera_ctx.camera_thread_commands = xEventGroupCreate();
+
     camera_ctx.ir_mode_timer = xTimerCreate("ir_tmr", pdMS_TO_TICKS(IR_MODE_TIMER_PERIOD_MS),
                              pdFALSE, NULL, ir_mode_timer_handler);
 
-    camera_config.sccb_i2c_port = i2c_bus_id;
-
-    camera_ctx.camera_thread_commands = xEventGroupCreate();
     xTaskCreatePinnedToCore(camera_thread_entry, "AICAM", CAMERA_THREAD_STACK_SIZE,
             NULL, CAMERA_THREAD_PRIORITY, &camera_ctx.camera_thread, 0);
     configASSERT(&camera_ctx.camera_thread);
@@ -224,7 +222,6 @@ void ai_camera_init(int i2c_bus_id)
 
 void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_cb, void *p_ctx)
 {
-    camera_config.pixel_format = PIXFORMAT_JPEG;
     camera_ctx.running = true;
     camera_ctx.pipeline = pipeline;
     camera_ctx.p_frame_cb = p_cb;
@@ -249,9 +246,7 @@ camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
 
 void ai_camera_fb_return(camera_fb_t *p_fb)
 {
-    //free(p_fb->buf);
-    free(p_fb);
-    //esp_camera_fb_return(p_fb);
+    esp_camera_fb_return(p_fb);
 }
 
 void ai_camera_get_stats(ai_camera_stats_t *p_stats_out)
@@ -517,34 +512,7 @@ static camera_fb_t *camera_get_frame(void)
     if (!camera_ctx.running) {
         return NULL;
     }
-#if ENABLE_CAMERA_MOCK
-    const uint32_t seed = xTaskGetTickCount();
-    static uint8_t *p_buf = NULL;
-    static size_t len = 0;
-    const uint32_t w = 160;
-    const uint32_t h = 120;
-    if (NULL == p_buf) {
-        uint8_t *p_raw = malloc(w * h);
-        for (int i = 0; i < h; i++) {
-            for (int j = 0; j < w; j++) {
-                const uint32_t val = 128 + 127 * (sinf((seed % 100 + j)/5.f) * sinf((seed % 100 + i)/5.f));
-                p_raw[i * w + j] = MAX(MIN(val, 255), 0);
-            }
-        }
-        fmt2jpg(p_raw, w * h, w, h, PIXFORMAT_GRAYSCALE, 30, &p_buf, &len);
-        free(p_raw);
-    }
-    camera_fb_t *p_mock = calloc(1, sizeof(camera_fb_t));
-    p_mock->buf = p_buf;
-    p_mock->len = len;
-    p_mock->width = w;
-    p_mock->height = h;
-    p_mock->format = PIXFORMAT_JPEG;
-    vTaskDelay(pdMS_TO_TICKS(100));
-    return p_mock;
-#else
     return esp_camera_fb_get();
-#endif
 }
 
 static void camera_thread_sleep(void)
