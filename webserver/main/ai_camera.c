@@ -472,6 +472,7 @@ static void camera_thread_entry(void *pvParam)
     if (ESP_OK != err) {
         ESP_LOGE(TAG, "Camera initialization failed: %s", esp_err_to_name(err));
     }
+    ai_pipeline_init();
     camera_thread_sleep(); // Wait for ai_camera_start();
     while (1) {
         const uint32_t commands = xEventGroupGetBits(camera_ctx.camera_thread_commands);

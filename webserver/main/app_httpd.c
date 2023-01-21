@@ -427,9 +427,9 @@ fail:
 static esp_err_t http_handler_get_stream(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "Stream andshake done, a new WS connection was opened");
+        ESP_LOGI(TAG, "Stream handshake done, a new WS connection was opened");
         ai_camera_stop();
-        ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, camera_frame_cb, camera_metadata_cb,
+        ai_camera_start(AI_CAMERA_PIPELINE_CNN, camera_frame_cb, camera_metadata_cb,
                 (void *)httpd_req_to_sockfd(req));
     }
 

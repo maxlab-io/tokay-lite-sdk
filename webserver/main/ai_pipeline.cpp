@@ -14,7 +14,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define TAG "AIPIPE"
 
-static constexpr int kTensorArenaSize = 81 * 1024;
+static constexpr int kTensorArenaSize = 128 * 1024;
 static const tflite::Model* model;
 static tflite::MicroInterpreter* interpreter;
 static uint8_t *tensor_arena;
@@ -52,16 +52,16 @@ extern "C" {
 
 void ai_pipeline_init(void)
 {
-    tensor_arena = (uint8_t *) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    tensor_arena = (uint8_t *) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
     if (tensor_arena == NULL) {
-        printf("Couldn't allocate memory of %d bytes\n", kTensorArenaSize);
+        ESP_LOGE(TAG, "Couldn't allocate memory of %d bytes\n", kTensorArenaSize);
         return;
     }
 
     model = tflite::GetModel(g_person_detect_model_data);
     if (model->version() != TFLITE_SCHEMA_VERSION) {
-        MicroPrintf("Model provided is schema version %d not equal to supported "
-                    "version %d.", model->version(), TFLITE_SCHEMA_VERSION);
+        ESP_LOGE(TAG, "Model provided is schema version %lu not equal to supported "
+                    "version %d", model->version(), TFLITE_SCHEMA_VERSION);
         return;
     }
 
@@ -89,7 +89,7 @@ void ai_pipeline_init(void)
     // Allocate memory from the tensor_arena for the model's tensors.
     TfLiteStatus allocate_status = interpreter->AllocateTensors();
     if (allocate_status != kTfLiteOk) {
-        MicroPrintf("AllocateTensors() failed");
+        ESP_LOGE(TAG, "AllocateTensors() failed");
         return;
     }
 }
@@ -99,17 +99,21 @@ void ai_pipeline_start(const uint8_t *p_frame_data, uint32_t size)
     // Get information about the memory area to use for the model's input.
     TfLiteTensor *input = interpreter->input(0);
 
-    /* Convert from uint8 picture data to int8 */
-    for (int i = 0; i < kNumCols * kNumRows; i++) {
-        input->data.int8[i] = (p_frame_data)[i] ^ 0x80;
-    }
-
     jpeg_decode(p_frame_data, size, input->data.uint8);
 
     // Run the model on this input and make sure it succeeds.
     if (kTfLiteOk != interpreter->Invoke()) {
-        MicroPrintf("Invoke failed");
+        ESP_LOGE(TAG, "Invoke failed");
     }
+    TfLiteTensor *output = interpreter->output(0);
+    int8_t person_score = output->data.uint8[kPersonIndex];
+    int8_t no_person_score = output->data.uint8[kNotAPersonIndex];
+
+    float person_score_f =
+        (person_score - output->params.zero_point) * output->params.scale;
+    float no_person_score_f =
+        (no_person_score - output->params.zero_point) * output->params.scale;
+    ESP_LOGI(TAG, "Person %f, no person %f", person_score_f, no_person_score_f);
 }
 
 void ai_pipeline_wait(TickType_t timeous_ticks)
@@ -160,9 +164,9 @@ static bool jpeg_decode(const uint8_t *p_in_data, size_t len, uint8_t *p_out_dat
         return ESP_FAIL;
     }
 
-    ctx.out_width = decoder.width;
+    ctx.out_width = decoder.width / 8;
 
-    jres = jd_decomp(&decoder, jpg_write_data_cb, 0);
+    jres = jd_decomp(&decoder, jpg_write_data_cb, 3);
 
     if (jres != JDR_OK) {
         ESP_LOGE(TAG, "JPG Decompression Failed: %d", jres);
@@ -176,7 +180,9 @@ static size_t jpg_get_data_cb(JDEC* decoder, uint8_t* buff, size_t ndata)
 {
     decode_ctx_t *p_ctx = (decode_ctx_t *)decoder->device;
     const size_t to_read = MIN(p_ctx->in_size - p_ctx->in_offset, ndata);
-    memcpy(buff, p_ctx->in_buf + p_ctx->in_offset, to_read);
+    if (NULL != buff) {
+        memcpy(buff, p_ctx->in_buf + p_ctx->in_offset, to_read);
+    }
     p_ctx->in_offset += to_read;
     return to_read;
 }
