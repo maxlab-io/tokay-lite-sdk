@@ -47,6 +47,7 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req);
 static esp_err_t http_handler_ws_telemetry(httpd_req_t *req);
 
 static esp_err_t http_handler_get_stream(httpd_req_t *req);
+static void camera_metadata_cb(const char *p_meta_json, void *p_ctx);
 static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size,
         bool start_of_frame, void *p_ctx);
 
@@ -428,26 +429,16 @@ static esp_err_t http_handler_get_stream(httpd_req_t *req)
     if (req->method == HTTP_GET) {
         ESP_LOGI(TAG, "Stream andshake done, a new WS connection was opened");
         ai_camera_stop();
-        ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, camera_frame_cb, (void *)httpd_req_to_sockfd(req));
+        ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, camera_frame_cb, camera_metadata_cb,
+                (void *)httpd_req_to_sockfd(req));
     }
 
     return ESP_OK;
 }
 
-static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size,
-                                     bool start_of_frame, void *p_ctx)
+static void camera_metadata_cb(const char *p_meta_json, void *p_ctx)
 {
     const int fd = (int)p_ctx;
-
-    httpd_ws_frame_t ws_pkt = { 0 };
-    ws_pkt.payload = (uint8_t *)p_data;
-    ws_pkt.len = size;
-    ws_pkt.type = HTTPD_WS_TYPE_BINARY;
-    esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
-    if (ESP_OK != ret) {
-        ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
-        ai_camera_stop();
-    }
 
     cJSON *p_root = cJSON_CreateObject();
     if (NULL == p_root) {
@@ -471,15 +462,31 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
     }
     cJSON_Delete(p_root);
 
-    memset(&ws_pkt, 0, sizeof(ws_pkt));
+    httpd_ws_frame_t ws_pkt = { 0 };
     ws_pkt.payload = (uint8_t*)p_response;
     ws_pkt.len = strlen(p_response);
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-    ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
+    esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
         ai_camera_stop();
         return;
     }
     free(p_response);
+}
+
+static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size,
+                                     bool start_of_frame, void *p_ctx)
+{
+    const int fd = (int)p_ctx;
+
+    httpd_ws_frame_t ws_pkt = { 0 };
+    ws_pkt.payload = (uint8_t *)p_data;
+    ws_pkt.len = size;
+    ws_pkt.type = HTTPD_WS_TYPE_BINARY;
+    esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
+    if (ESP_OK != ret) {
+        ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
+        ai_camera_stop();
+    }
 }

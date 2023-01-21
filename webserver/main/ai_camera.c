@@ -176,7 +176,8 @@ static struct {
     TimerHandle_t ir_mode_timer;
     ai_camera_pipeline_t pipeline;
     ai_camera_frame_cb_t p_frame_cb;
-    void *p_frame_cb_ctx;
+    ai_camera_meta_cb_t p_meta_cb;
+    void *p_cb_ctx;
     TaskHandle_t camera_thread;
     EventGroupHandle_t camera_thread_commands;
     ai_camera_stats_t stats;
@@ -221,12 +222,14 @@ void ai_camera_init(int i2c_bus_id)
     configASSERT(&camera_ctx.camera_thread);
 }
 
-void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_cb, void *p_ctx)
+void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_frame_cb,
+        ai_camera_meta_cb_t p_meta_cb, void *p_ctx)
 {
     camera_ctx.running = true;
     camera_ctx.pipeline = pipeline;
-    camera_ctx.p_frame_cb = p_cb;
-    camera_ctx.p_frame_cb_ctx = p_ctx;
+    camera_ctx.p_frame_cb = p_frame_cb;
+    camera_ctx.p_meta_cb = p_meta_cb;
+    camera_ctx.p_cb_ctx = p_ctx;
     update_ir_mode();
     xEventGroupClearBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
     xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
@@ -473,6 +476,7 @@ static void camera_thread_entry(void *pvParam)
     while (1) {
         const uint32_t commands = xEventGroupGetBits(camera_ctx.camera_thread_commands);
         if (commands & (1 << CAMERA_CMD_STOP)) {
+            ESP_LOGI(TAG, "Stopping camera thread");
             camera_thread_sleep();
         }
         if (commands & (1 << CAMERA_CMD_APPLY_SETTINGS)) {
@@ -501,7 +505,7 @@ static void camera_thread_entry(void *pvParam)
                 ai_pipeline_get_results();
             }
             if (NULL != camera_ctx.p_frame_cb) {
-                camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, true, camera_ctx.p_frame_cb_ctx);
+                camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, true, camera_ctx.p_cb_ctx);
             }
         }
         ai_camera_fb_return(p_frame);

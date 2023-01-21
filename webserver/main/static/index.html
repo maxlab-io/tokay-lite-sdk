@@ -41,8 +41,7 @@
           </div>
           <div class="col">
             <div class="row">
-                <img id="viewport" height="600px" src="/image.jpg"
-                    onerror="this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='">
+                <canvas id="viewport" width="1600" height="1200" style="border:1px solid #d3d3d3;width:100%;height:600px;"/>
             </div>
             <div class="row gap-5" style="margin: 5px">
               <button type="button" id="playStream" class="col btn btn-outline-success">Run stream <span class="bi bi-file-play-fill"></button>
@@ -85,20 +84,24 @@
                 if (typeof event.data === "string") {
                     stream_metadata = JSON.parse(event.data);
                 } else {
-                    var image_url = window.URL.createObjectURL(event.data);
-                    $('#viewport').attr('src', image_url)
+                    const image_url = window.URL.createObjectURL(event.data);
+                    const frame = new Image();
+                    frame.onload = () => {
+                        var canvas = document.getElementById("viewport");
+                        var ctx = canvas.getContext("2d");
+                        canvas.height = frame.height;
+                        canvas.width = canvas.clientWidth *  (canvas.height / canvas.clientHeight);
+                        ctx.drawImage(frame, (canvas.width - frame.width) / 2, 0);
+                        URL.revokeObjectURL(image_url);
+                    }
+                    frame.src = image_url;
                 }
             }
             socket.onopen = function(event) {
                 $('#stopStream').click(() => {
                     socket.close()
-                    $('#viewport').attr('src', '/image.jpg');
                 });
             }
-        }
-
-        function handleStopStream() {
-            $('#viewport').attr('src', '/image.jpg');
         }
 
         function makeDownload(file_path) {
