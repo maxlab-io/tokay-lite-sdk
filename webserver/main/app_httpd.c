@@ -223,7 +223,7 @@ static esp_err_t http_handler_get_picture(httpd_req_t *req)
     default:
         assert(0);
     }
-    camera_fb_t *p_fb = ai_camera_get_frame(target_pixformat, pdMS_TO_TICKS(500));
+    camera_fb_t *p_fb = ai_camera_get_frame(target_pixformat, pdMS_TO_TICKS(1000));
     if (NULL == p_fb) {
         httpd_resp_set_status(req, "500 Capture timeout");
         httpd_resp_send(req, NULL, 0);

@@ -149,9 +149,9 @@ static camera_config_t camera_config = {
     .ledc_channel = LEDC_CHANNEL_0,
 
     .pixel_format = PIXFORMAT_JPEG,
-    .frame_size = FRAMESIZE_UXGA,
+    .frame_size = FRAMESIZE_768X768,
 
-    .jpeg_quality = 30,
+    .jpeg_quality = 10,
     .fb_count = 1,
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
     .fb_location = CAMERA_FB_IN_PSRAM,
@@ -159,12 +159,9 @@ static camera_config_t camera_config = {
 };
 
 typedef enum {
-    CAMERA_CMD_APPLY_SETTINGS,
-    CAMERA_CMD_GET_JPEG,
-    CAMERA_CMD_GET_YUV422,
-    CAMERA_CMD_GET_RGB565,
     CAMERA_CMD_START,
     CAMERA_CMD_STOP,
+    CAMERA_CMD_RESP_STOP_DONE,
 
     CAMERA_CMD_MAX = 32
 } camera_cmd_t;
@@ -194,7 +191,6 @@ static void ir_mode_night(void);
 static void update_ir_mode(void);
 static void ir_mode_timer_handler(TimerHandle_t timer);
 static void camera_thread_entry(void *pvParam);
-static camera_fb_t *camera_get_frame(void);
 static void camera_thread_sleep(void);
 
 void ai_camera_init(int i2c_bus_id)
@@ -231,26 +227,51 @@ void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_frame
     camera_ctx.p_meta_cb = p_meta_cb;
     camera_ctx.p_cb_ctx = p_ctx;
     update_ir_mode();
-    xEventGroupClearBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
     xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
 }
 
 void ai_camera_stop(void)
 {
-    xEventGroupClearBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
     xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
+    xEventGroupWaitBits(camera_ctx.camera_thread_commands,
+            (1 << CAMERA_CMD_RESP_STOP_DONE), pdTRUE, pdTRUE, portMAX_DELAY);
     xTimerStop(camera_ctx.ir_mode_timer, portMAX_DELAY); // not reliable, but good for now
     camera_ctx.running = false;
 }
 
 camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
 {
-    return NULL;
+    if (!camera_ctx.running) {
+        return NULL;
+    }
+    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
+    const EventBits_t bits = xEventGroupWaitBits(camera_ctx.camera_thread_commands,
+            (1 << CAMERA_CMD_RESP_STOP_DONE), pdTRUE, pdTRUE, timeout_ms);
+    if (0 == (bits & (1 << CAMERA_CMD_RESP_STOP_DONE))) {
+        xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
+        return NULL;
+    }
+    if (format != PIXFORMAT_JPEG) {
+        // This is far from perfect:
+        // the reinit sequence is required to change the DMA buffer size
+        // and this also resets sensor AE and AWB states, producing bad quality images
+        esp_camera_deinit();
+        camera_config.pixel_format = format;
+        esp_camera_init(&camera_config);
+    }
+    // TODO: incorporate timeout
+    return esp_camera_fb_get();
 }
 
 void ai_camera_fb_return(camera_fb_t *p_fb)
 {
     esp_camera_fb_return(p_fb);
+    if (camera_config.pixel_format != PIXFORMAT_JPEG) {
+        esp_camera_deinit();
+        camera_config.pixel_format = PIXFORMAT_JPEG;
+        esp_camera_init(&camera_config);
+    }
+    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
 }
 
 void ai_camera_get_stats(ai_camera_stats_t *p_stats_out)
@@ -473,26 +494,15 @@ static void camera_thread_entry(void *pvParam)
         ESP_LOGE(TAG, "Camera initialization failed: %s", esp_err_to_name(err));
     }
     ai_pipeline_init();
-    camera_thread_sleep(); // Wait for ai_camera_start();
     while (1) {
-        const uint32_t commands = xEventGroupGetBits(camera_ctx.camera_thread_commands);
+        const uint32_t commands = xEventGroupWaitBits(camera_ctx.camera_thread_commands,
+                (1 << CAMERA_CMD_STOP), pdTRUE, pdTRUE, 0);
         if (commands & (1 << CAMERA_CMD_STOP)) {
             ESP_LOGI(TAG, "Stopping camera thread");
             camera_thread_sleep();
+            ESP_LOGI(TAG, "Resuming camera thread");
         }
-        if (commands & (1 << CAMERA_CMD_APPLY_SETTINGS)) {
-            // TODO
-        }
-        if (commands & (1 << CAMERA_CMD_GET_JPEG)) {
-            // TODO
-        }
-        if (commands & (1 << CAMERA_CMD_GET_YUV422)) {
-            // TODO
-        }
-        if (commands & (1 << CAMERA_CMD_GET_RGB565)) {
-            // TODO
-        }
-        camera_fb_t *p_frame = camera_get_frame();
+        camera_fb_t *p_frame = esp_camera_fb_get();
         if (NULL == p_frame) {
             ESP_LOGE(TAG, "Failed to get frame");
             vTaskDelay(pdMS_TO_TICKS(500));
@@ -509,20 +519,13 @@ static void camera_thread_entry(void *pvParam)
                 camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, true, camera_ctx.p_cb_ctx);
             }
         }
-        ai_camera_fb_return(p_frame);
+        esp_camera_fb_return(p_frame);
     }
-}
-
-static camera_fb_t *camera_get_frame(void)
-{
-    if (!camera_ctx.running) {
-        return NULL;
-    }
-    return esp_camera_fb_get();
 }
 
 static void camera_thread_sleep(void)
 {
+    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_RESP_STOP_DONE));
     xEventGroupWaitBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START),
             pdTRUE, pdTRUE, portMAX_DELAY);
 }
