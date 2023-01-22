@@ -1,4 +1,4 @@
-#include "ai_camera.h"
+#include "ai_pipeline.h"
 
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -52,7 +52,7 @@ extern "C" {
 
 void ai_pipeline_init(void)
 {
-    tensor_arena = (uint8_t *) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+    tensor_arena = (uint8_t *) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
     if (tensor_arena == NULL) {
         ESP_LOGE(TAG, "Couldn't allocate memory of %d bytes\n", kTensorArenaSize);
         return;
@@ -190,17 +190,13 @@ static size_t jpg_get_data_cb(JDEC* decoder, uint8_t* buff, size_t ndata)
 static size_t jpg_write_data_cb(JDEC *decoder, void *data, JRECT *rect)
 {
     decode_ctx_t *p_ctx = (decode_ctx_t *)decoder->device;
-    uint16_t x = rect->left;
-    uint16_t y = rect->top;
-    uint16_t w = rect->right + 1 - x;
-    uint16_t h = rect->bottom + 1 - y;
-    for (int i = y; i < h; i++) {
-        //memcpy(&p_ctx->out_buf[i * p_ctx->out_height + x], data, w);
-        for (int j = x; j < w; j++) {
-            const uint8_t r = ((uint8_t *)data)[3 * ((i - h) * h + (j - w)) + 0];
-            const uint8_t g = ((uint8_t *)data)[3 * ((i - h) * h + (j - w)) + 1];
-            const uint8_t b = ((uint8_t *)data)[3 * ((i - h) * h + (j - w)) + 2];
-            p_ctx->out_buf[i * p_ctx->out_width + x] = ((r + g + b) / 3) ^ 0x80;
+    for (int i = rect->top; i < rect->bottom + 1; i++) {
+        for (int j = rect->left; j < rect->right + 1; j++) {
+            const uint8_t r = ((uint8_t *)data)[3 * ((i - rect->top)* p_ctx->out_width + j - rect->left) + 0];
+            const uint8_t g = ((uint8_t *)data)[3 * ((i - rect->top) * p_ctx->out_width + j - rect->left) + 1];
+            const uint8_t b = ((uint8_t *)data)[3 * ((i - rect->top) * p_ctx->out_width + j - rect->left) + 2];
+            const int8_t bw = ((r + g + b) / 3) ^ 0x80;
+            p_ctx->out_buf[i * p_ctx->out_width + j] = bw;
         }
     }
     return 1;
