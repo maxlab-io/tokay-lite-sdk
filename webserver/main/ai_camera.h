@@ -90,7 +90,7 @@ void ai_camera_fb_return(camera_fb_t *p_fb);
 void ai_camera_get_stats(ai_camera_stats_t *p_stats_out);
 
 ai_camera_ir_state_t ai_camera_get_ir_state(void);
-uint32_t ai_camera_get_light_level(void);
+float ai_camera_get_light_level(void);
 
 const char *ai_camera_config_get_name(ai_camera_config_t config);
 const void *ai_camera_config_get_value(ai_camera_config_t config);

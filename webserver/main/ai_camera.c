@@ -114,8 +114,8 @@ static int default_config[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_LENC] = 0,
     [AI_CAMERA_CONFIG_XCLK_FREQ] = XCLK_DEFAULT_FREQ_HZ,
     [AI_CAMERA_CONFIG_IR_MODE] = AI_CAMERA_IR_MODE_AUTO,
-    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = 100,
-    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = 50,
+    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = 40,
+    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = 10,
     [AI_CAMERA_CONFIG_IR_BRIGHTNESS] = 255,
 };
 
@@ -153,7 +153,6 @@ static camera_config_t camera_config = {
     .frame_size = FRAMESIZE_768X768,
 
     .jpeg_quality = 10,
-    .fb_count = 1,
     .fb_count = 2,
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
     .fb_location = CAMERA_FB_IN_PSRAM,
@@ -164,13 +163,14 @@ typedef enum {
     CAMERA_CMD_START,
     CAMERA_CMD_STOP,
     CAMERA_CMD_RESP_STOP_DONE,
+    CAMERA_CMD_READ_LIGHT_SENSOR,
 
     CAMERA_CMD_MAX = 32
 } camera_cmd_t;
 
 static struct {
     bool running;
-    uint32_t light_sensor_value;
+    float light_sensor_value;
     ai_camera_ir_state_t ir_state;
     TimerHandle_t ir_mode_timer;
     ai_camera_pipeline_t pipeline;
@@ -286,7 +286,7 @@ ai_camera_ir_state_t ai_camera_get_ir_state(void)
     return camera_ctx.ir_state;
 }
 
-uint32_t ai_camera_get_light_level(void)
+float ai_camera_get_light_level(void)
 {
     return camera_ctx.light_sensor_value;
 }
@@ -458,12 +458,18 @@ static void update_ir_mode(void)
         if (ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_MODE) == AI_CAMERA_IR_MODE_AUTO) {
             if (camera_ctx.light_sensor_value >
                 ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH)) {
-                ir_mode_day();
-                camera_ctx.ir_state = AI_CAMERA_IR_STATE_DAY;
+                if (camera_ctx.ir_state != AI_CAMERA_IR_STATE_DAY) {
+                    ESP_LOGI(TAG, "Switching to day");
+                    ir_mode_day();
+                    camera_ctx.ir_state = AI_CAMERA_IR_STATE_DAY;
+                }
             } else if (camera_ctx.light_sensor_value <
                        ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW)) {
-                ir_mode_night();
-                camera_ctx.ir_state = AI_CAMERA_IR_STATE_NIGHT;
+                if (camera_ctx.ir_state != AI_CAMERA_IR_STATE_NIGHT) {
+                    ESP_LOGI(TAG, "Switching to night");
+                    ir_mode_night();
+                    camera_ctx.ir_state = AI_CAMERA_IR_STATE_NIGHT;
+                }
             }
         }
     }
@@ -486,7 +492,7 @@ static void update_ir_mode(void)
 
 static void ir_mode_timer_handler(TimerHandle_t timer)
 {
-    update_ir_mode();
+    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_READ_LIGHT_SENSOR));
 }
 
 static void camera_thread_entry(void *pvParam)
@@ -508,6 +514,9 @@ static void camera_thread_entry(void *pvParam)
             ESP_LOGI(TAG, "Stopping camera thread");
             camera_thread_sleep();
             ESP_LOGI(TAG, "Resuming camera thread");
+        }
+        if (commands & (1 << CAMERA_CMD_READ_LIGHT_SENSOR)) {
+            update_ir_mode();
         }
         const uint32_t start_frame_ms = esp_timer_get_time() / 1000;
         camera_fb_t *p_frame = esp_camera_fb_get();

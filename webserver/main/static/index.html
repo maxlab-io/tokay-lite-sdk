@@ -143,7 +143,7 @@
             socket.onmessage = function(event) {
                 const resp_json = JSON.parse(event.data);
                 for (let k in resp_json) {
-                    $(`#${k}Val`).html(resp_json[k]);
+                    $(`#${k}Val`).html(Number(resp_json[k].toFixed(2)));
                 }
             }
             socket.onopen = function(event) {
