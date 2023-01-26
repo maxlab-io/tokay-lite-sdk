@@ -54,8 +54,6 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
 static void telemetry_timer_cb(TimerHandle_t handle);
 static void send_telemetry(void *arg);
 
-static esp_err_t ws_recv_frame(httpd_req_t *p_req, httpd_ws_frame_t *p_ws_pkt, uint8_t **p_buffer);
-
 extern const char index_html_start[] asm("_binary_index_html_start");
 extern const char wifi_setup_html_start[] asm("_binary_wifi_setup_html_start");
 
@@ -336,37 +334,6 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
     return httpd_resp_send(req, NULL, 0);
 }
 
-static esp_err_t ws_recv_frame(httpd_req_t *p_req, httpd_ws_frame_t *p_ws_pkt, uint8_t **p_buffer)
-{
-    memset(p_ws_pkt, 0, sizeof(httpd_ws_frame_t));
-    p_ws_pkt->type = HTTPD_WS_TYPE_TEXT;
-    /* Set max_len = 0 to get the frame len */
-    esp_err_t ret = httpd_ws_recv_frame(p_req, p_ws_pkt, 0);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "httpd_ws_recv_frame failed to get frame len with %d", ret);
-        return ret;
-    }
-    ESP_LOGI(TAG, "frame len is %d", p_ws_pkt->len);
-    if (p_ws_pkt->len) {
-        *p_buffer = calloc(1, p_ws_pkt->len);
-        if (NULL == *p_buffer) {
-            ESP_LOGE(TAG, "Failed to calloc memory for buf");
-            return ESP_ERR_NO_MEM;
-        }
-        p_ws_pkt->payload = *p_buffer;
-        /* Set max_len = ws_pkt.len to get the frame payload */
-        ret = httpd_ws_recv_frame(p_req, p_ws_pkt, p_ws_pkt->len);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
-            free(*p_buffer);
-            return ret;
-        }
-        ESP_LOGI(TAG, "Got packet with message: %s", p_ws_pkt->payload);
-    }
-    ESP_LOGI(TAG, "Packet type: %d", p_ws_pkt->type);
-    return ESP_OK;
-}
-
 static esp_err_t http_handler_ws_telemetry(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
@@ -416,12 +383,15 @@ static void send_telemetry(void *arg)
     const esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
+        xTimerStop(app_httpd_ctx.telemetry_timer, portMAX_DELAY);
+        httpd_sess_trigger_close(app_httpd_ctx.http_server_handle, fd);
     }
     free(p_response);
     return;
 fail:
     cJSON_Delete(p_root);
     ESP_LOGE(TAG, "Failed to generate telemetry JSON");
+    httpd_sess_trigger_close(app_httpd_ctx.http_server_handle, fd);
 }
 
 static esp_err_t http_handler_get_stream(httpd_req_t *req)
@@ -444,6 +414,7 @@ static void camera_metadata_cb(cJSON *p_meta_root, void *p_ctx)
     if (NULL == p_response) {
         ESP_LOGE(TAG, "Failed to generate frame meta JSON");
         ai_camera_stop();
+        httpd_sess_trigger_close(app_httpd_ctx.http_server_handle, fd);
         return;
     }
 
@@ -456,6 +427,7 @@ static void camera_metadata_cb(cJSON *p_meta_root, void *p_ctx)
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
         ai_camera_stop();
+        httpd_sess_trigger_close(app_httpd_ctx.http_server_handle, fd);
         return;
     }
 }
@@ -473,5 +445,6 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
         ai_camera_stop();
+        httpd_sess_trigger_close(app_httpd_ctx.http_server_handle, fd);
     }
 }
