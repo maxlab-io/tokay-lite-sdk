@@ -11,6 +11,7 @@
 #include "freertos/timers.h"
 
 #include "esp_log.h"
+#include "esp_timer.h"
 
 #define BATT_DETECT_ADC_CHANNEL  ADC_CHANNEL_0 // GPIO1
 #define BATT_DETECT_MV_TO_BATT_MV(x) (x * 2)
@@ -91,6 +92,52 @@ void bsp_temp_sensor_read(float *p_out)
     ESP_ERROR_CHECK(temperature_sensor_enable(temp_sensor));
     ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, p_out));
     ESP_ERROR_CHECK(temperature_sensor_disable(temp_sensor));
+}
+
+int8_t apds9306_i2c_read(uint8_t address, uint8_t reg, uint8_t *data, uint16_t count)
+{
+    int8_t ret;
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, address << 1 | I2C_MASTER_WRITE, 1 /* expect ack */);
+    i2c_master_write_byte(cmd, reg, 1 /* expect ack */);
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, address << 1 | I2C_MASTER_READ, 1 /* expect ack */);
+    i2c_master_read(cmd, data, count, I2C_MASTER_LAST_NACK);
+    i2c_master_stop(cmd);
+
+    ret = i2c_master_cmd_begin(BSP_I2C_BUS_ID, cmd, pdMS_TO_TICKS(500));
+    i2c_cmd_link_delete(cmd);
+
+    return ret;
+}
+
+int8_t apds9306_i2c_write(uint8_t address, uint8_t reg, const uint8_t *data, uint16_t count)
+{
+    int8_t ret;
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, address << 1 | I2C_MASTER_WRITE, 1 /* expect ack */);
+    i2c_master_write_byte(cmd, reg, 1 /* expect ack */);
+    i2c_master_write(cmd, data, count, 1 /* expect ack */);
+    i2c_master_stop(cmd);
+
+    ret = i2c_master_cmd_begin(BSP_I2C_BUS_ID, cmd, pdMS_TO_TICKS(500));
+    i2c_cmd_link_delete(cmd);
+
+    return ret;
+}
+
+void apds9306_i2c_delay_ms(uint32_t delay)
+{
+    if (delay >= portTICK_PERIOD_MS) {
+        vTaskDelay(pdMS_TO_TICKS(delay));
+    } else {
+        const uint64_t start = esp_timer_get_time();
+        while (esp_timer_get_time() - start < delay * 1000);
+    }
 }
 
 static bool init_adc_calibration(adc_unit_t unit, adc_atten_t atten, adc_cali_handle_t *out_handle)
