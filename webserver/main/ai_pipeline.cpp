@@ -9,15 +9,28 @@
 
 #include "esp32s3/rom/tjpgd.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+
 #include "person_detect_model_data.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define TAG "AIPIPE"
 
+#define TFLITE_TASK_STACK_SIZE 4096
+#define TFLITE_TASK_PRIORITY   10
+
 static constexpr int kTensorArenaSize = 128 * 1024;
 static const tflite::Model* model;
 static tflite::MicroInterpreter* interpreter;
 static uint8_t *tensor_arena;
+
+static TaskHandle_t tflite_task_handle;
+static SemaphoreHandle_t tflite_done_sem;
+static SemaphoreHandle_t decode_done_sem;
+static const uint8_t *p_input;
+static size_t input_size;
 
 // Keeping these as constant expressions allow us to allocate fixed-sized arrays
 // on the stack for our working memory.
@@ -45,6 +58,7 @@ typedef struct decode_ctx_t {
 static bool jpeg_decode(const uint8_t *p_in_data, size_t len, uint8_t *p_out_data);
 static size_t jpg_get_data_cb(JDEC* decoder, uint8_t* buff, size_t ndata);
 static size_t jpg_write_data_cb(JDEC *decoder, void *data, JRECT *rect);
+static void tflite_task_entry(void *);
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,33 +106,30 @@ void ai_pipeline_init(void)
         ESP_LOGE(TAG, "AllocateTensors() failed");
         return;
     }
+
+    tflite_done_sem = xSemaphoreCreateBinary();
+    decode_done_sem = xSemaphoreCreateBinary();
+    xTaskCreatePinnedToCore(tflite_task_entry, "TFLITE", TFLITE_TASK_STACK_SIZE,
+                            NULL, TFLITE_TASK_PRIORITY, &tflite_task_handle, 1);
+    configASSERT(&tflite_task_handle);
 }
 
 void ai_pipeline_start(const uint8_t *p_frame_data, uint32_t size)
 {
-    // Get information about the memory area to use for the model's input.
-    TfLiteTensor *input = interpreter->input(0);
-
-    jpeg_decode(p_frame_data, size, input->data.uint8);
-
     // Run the model on this input and make sure it succeeds.
-    if (kTfLiteOk != interpreter->Invoke()) {
-        ESP_LOGE(TAG, "Invoke failed");
-    }
-    TfLiteTensor *output = interpreter->output(0);
-    int8_t person_score = output->data.uint8[kPersonIndex];
-    int8_t no_person_score = output->data.uint8[kNotAPersonIndex];
+    p_input = p_frame_data;
+    input_size = size;
+    xTaskNotify(tflite_task_handle, 0, eNoAction);
+}
 
-    float person_score_f =
-        (person_score - output->params.zero_point) * output->params.scale;
-    float no_person_score_f =
-        (no_person_score - output->params.zero_point) * output->params.scale;
-    ESP_LOGI(TAG, "Person %f, no person %f", person_score_f, no_person_score_f);
+void ai_pipeline_wait_decode_finish(TickType_t timeous_ticks)
+{
+    xSemaphoreTake(decode_done_sem, portMAX_DELAY);
 }
 
 void ai_pipeline_wait(TickType_t timeous_ticks)
 {
-
+    xSemaphoreTake(tflite_done_sem, portMAX_DELAY);
 }
 
 TfLiteTensor *ai_pipeline_get_results(void)
@@ -200,4 +211,33 @@ static size_t jpg_write_data_cb(JDEC *decoder, void *data, JRECT *rect)
         }
     }
     return 1;
+}
+
+static void tflite_task_entry(void *)
+{
+    while (1) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        // Get information about the memory area to use for the model's input.
+        TfLiteTensor *input = interpreter->input(0);
+
+        //jpeg_decode(p_input, input_size, input->data.uint8);
+        for (int i = 0; i < 96 * 96; i++) {
+            input->data.int8[i] = p_input[i * 2 + 1] ^ 0x80;
+        }
+        xSemaphoreGive(decode_done_sem);
+
+        if (kTfLiteOk != interpreter->Invoke()) {
+            ESP_LOGE(TAG, "Invoke failed");
+        }
+        TfLiteTensor *output = interpreter->output(0);
+        int8_t person_score = output->data.uint8[kPersonIndex];
+        int8_t no_person_score = output->data.uint8[kNotAPersonIndex];
+
+        float person_score_f =
+            (person_score - output->params.zero_point) * output->params.scale;
+        float no_person_score_f =
+            (no_person_score - output->params.zero_point) * output->params.scale;
+        ESP_LOGI(TAG, "Person %f, no person %f", person_score_f, no_person_score_f);
+        xSemaphoreGive(tflite_done_sem);
+    }
 }

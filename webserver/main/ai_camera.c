@@ -512,14 +512,21 @@ static void camera_thread_entry(void *pvParam)
         if (AI_CAMERA_PIPELINE_DISCARD != current_pipeline) {
             if (AI_CAMERA_PIPELINE_CNN == current_pipeline) {
                 ai_pipeline_start(p_frame->buf, p_frame->len);
-                ai_pipeline_wait(pdMS_TO_TICKS(600));
-                ai_pipeline_get_results();
             }
             if (NULL != camera_ctx.p_frame_cb) {
                 camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, true, camera_ctx.p_cb_ctx);
             }
+            if (AI_CAMERA_PIPELINE_CNN == current_pipeline) {
+                ai_pipeline_wait_decode_finish(pdMS_TO_TICKS(600));
+            }
+            esp_camera_fb_return(p_frame);
+            if (AI_CAMERA_PIPELINE_CNN == current_pipeline) {
+                ai_pipeline_wait(pdMS_TO_TICKS(600));
+                ai_pipeline_get_results();
+            }
+        } else {
+            esp_camera_fb_return(p_frame);
         }
-        esp_camera_fb_return(p_frame);
     }
 }
 
