@@ -24,6 +24,8 @@
 //#define BUTTON_PIN              41LLU
 #define BUTTON_PIN              0
 
+#define PWR_EN_PIN              14
+
 #define TAG "bsp"
 
 static adc_oneshot_unit_handle_t adc1_handle;
@@ -58,6 +60,15 @@ void bsp_init(void (*usr_button_cb)(void))
         .scl_pullup_en = GPIO_PULLUP_DISABLE,
         .master.clk_speed = I2C_FREQUENCY,
     };
+
+    gpio_config_t io_conf = {};
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = (1LLU << PWR_EN_PIN);
+    io_conf.pull_down_en = 0;
+    io_conf.pull_up_en = 0;
+    ESP_ERROR_CHECK(gpio_set_level(PWR_EN_PIN, 1));
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
 
     ESP_ERROR_CHECK(i2c_param_config(BSP_I2C_BUS_ID, &conf));
     init_vbat_adc();

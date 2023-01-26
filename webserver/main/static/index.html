@@ -77,22 +77,34 @@
     <script type="text/javascript">
 
         function handlePlayStream() {
-            let stream_metadata = null;
+            var stream_metadata = null;
             let socket = new WebSocket("ws://" + location.host + "/stream");
             socket.binaryType = "blob";
             socket.onmessage = (event) => {
                 if (typeof event.data === "string") {
                     stream_metadata = JSON.parse(event.data);
+                    var canvas = document.getElementById("viewport");
+                    var ctx = canvas.getContext("2d");
                 } else {
                     const image_url = window.URL.createObjectURL(event.data);
                     const frame = new Image();
                     frame.onload = () => {
                         var canvas = document.getElementById("viewport");
                         var ctx = canvas.getContext("2d");
-                        canvas.height = frame.height;
-                        canvas.width = canvas.clientWidth *  (canvas.height / canvas.clientHeight);
+                        const height = frame.height;
+                        const width = canvas.clientWidth *  (height / canvas.clientHeight);
+                        if (canvas.height != height) {
+                            canvas.height = height;
+                        }
+                        if (canvas.width != width) {
+                            canvas.width = width;
+                        }
                         ctx.drawImage(frame, (canvas.width - frame.width) / 2, 0);
                         URL.revokeObjectURL(image_url);
+                        ctx.font = "20px monospace";
+                        ctx.fillText(`FPS: ${stream_metadata['fps'].toFixed(2)}`, 0, 20);
+                        ctx.fillText(`Person score: ${stream_metadata['cnn_output']['person_score'].toFixed(2)}`, 0, 40);
+                        ctx.fillText(`No person score: ${stream_metadata['cnn_output']['no_person_score'].toFixed(2)}`, 0, 60);
                     }
                     frame.src = image_url;
                 }

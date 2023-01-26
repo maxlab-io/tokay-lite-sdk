@@ -32,6 +32,10 @@ static SemaphoreHandle_t decode_done_sem;
 static const uint8_t *p_input;
 static size_t input_size;
 
+static cJSON *p_results_root;
+static cJSON *p_results_person_score;
+static cJSON *p_results_no_person_score;
+
 // Keeping these as constant expressions allow us to allocate fixed-sized arrays
 // on the stack for our working memory.
 
@@ -107,6 +111,10 @@ void ai_pipeline_init(void)
         return;
     }
 
+    p_results_root = cJSON_CreateObject();
+    p_results_person_score = cJSON_AddNumberToObject(p_results_root, "person_score", 0);
+    p_results_no_person_score = cJSON_AddNumberToObject(p_results_root, "no_person_score", 1);
+
     tflite_done_sem = xSemaphoreCreateBinary();
     decode_done_sem = xSemaphoreCreateBinary();
     xTaskCreatePinnedToCore(tflite_task_entry, "TFLITE", TFLITE_TASK_STACK_SIZE,
@@ -132,20 +140,9 @@ void ai_pipeline_wait(TickType_t timeous_ticks)
     xSemaphoreTake(tflite_done_sem, portMAX_DELAY);
 }
 
-TfLiteTensor *ai_pipeline_get_results(void)
+cJSON *ai_pipeline_get_results(void)
 {
-    return interpreter->output(0);
-
-    /*
-    // Process the inference results.
-    int8_t person_score = output->data.uint8[kPersonIndex];
-    int8_t no_person_score = output->data.uint8[kNotAPersonIndex];
-
-    float person_score_f =
-        (person_score - output->params.zero_point) * output->params.scale;
-    float no_person_score_f =
-        (no_person_score - output->params.zero_point) * output->params.scale;
-    */
+    return p_results_root;
 }
 
 void ai_pipeline_deinit(void)
@@ -220,10 +217,7 @@ static void tflite_task_entry(void *)
         // Get information about the memory area to use for the model's input.
         TfLiteTensor *input = interpreter->input(0);
 
-        //jpeg_decode(p_input, input_size, input->data.uint8);
-        for (int i = 0; i < 96 * 96; i++) {
-            input->data.int8[i] = p_input[i * 2 + 1] ^ 0x80;
-        }
+        jpeg_decode(p_input, input_size, input->data.uint8);
         xSemaphoreGive(decode_done_sem);
 
         if (kTfLiteOk != interpreter->Invoke()) {
@@ -233,11 +227,12 @@ static void tflite_task_entry(void *)
         int8_t person_score = output->data.uint8[kPersonIndex];
         int8_t no_person_score = output->data.uint8[kNotAPersonIndex];
 
-        float person_score_f =
+        const float person_score_f =
             (person_score - output->params.zero_point) * output->params.scale;
-        float no_person_score_f =
+        const float no_person_score_f =
             (no_person_score - output->params.zero_point) * output->params.scale;
-        ESP_LOGI(TAG, "Person %f, no person %f", person_score_f, no_person_score_f);
+        p_results_person_score->valuedouble = person_score_f;
+        p_results_no_person_score->valuedouble = no_person_score_f;
         xSemaphoreGive(tflite_done_sem);
     }
 }

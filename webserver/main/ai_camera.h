@@ -77,7 +77,7 @@ typedef struct {
 
 typedef void (*ai_camera_frame_cb_t)(pixformat_t format, const uint8_t *p_data, uint32_t size,
                                      bool start_of_frame, void *p_ctx);
-typedef void (*ai_camera_meta_cb_t)(const char *p_meta_json, void *p_ctx);
+typedef void (*ai_camera_meta_cb_t)(cJSON *p_meta_root, void *p_ctx);
 
 void ai_camera_init(int i2c_bus_id);
 void ai_camera_start(ai_camera_pipeline_t pipeline_type, ai_camera_frame_cb_t p_frame_cb,
