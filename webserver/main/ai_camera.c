@@ -154,6 +154,7 @@ static camera_config_t camera_config = {
 
     .jpeg_quality = 10,
     .fb_count = 1,
+    .fb_count = 2,
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
     .fb_location = CAMERA_FB_IN_PSRAM,
     //.fb_size = 1024 * 120, // TODO: port to esp32-camera upstream
