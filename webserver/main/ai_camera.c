@@ -505,7 +505,7 @@ static void camera_thread_entry(void *pvParam)
     cJSON *p_meta_root = cJSON_CreateObject();
     cJSON_AddItemToObject(p_meta_root, "cnn_output", ai_pipeline_get_results());
     cJSON *p_stats_fps = cJSON_AddNumberToObject(p_meta_root, "fps", 0);
-    uint32_t total_frame_time_ms = 0;
+    int64_t total_frame_time_us = 0;
     uint32_t total_frames = 0;
     while (1) {
         const uint32_t commands = xEventGroupWaitBits(camera_ctx.camera_thread_commands,
@@ -518,7 +518,7 @@ static void camera_thread_entry(void *pvParam)
         if (commands & (1 << CAMERA_CMD_READ_LIGHT_SENSOR)) {
             update_ir_mode();
         }
-        const uint32_t start_frame_ms = esp_timer_get_time() / 1000;
+        const int64_t start_frame_us = esp_timer_get_time();
         camera_fb_t *p_frame = esp_camera_fb_get();
         if (NULL == p_frame) {
             ESP_LOGE(TAG, "Failed to get frame");
@@ -543,16 +543,16 @@ static void camera_thread_entry(void *pvParam)
         } else {
             esp_camera_fb_return(p_frame);
         }
-        const uint32_t end_frame_ms = esp_timer_get_time() / 1000;
-        total_frame_time_ms += end_frame_ms - start_frame_ms;
+        const int64_t end_frame_us = esp_timer_get_time();
+        total_frame_time_us += end_frame_us - start_frame_us;
         total_frames++;
         if (NULL != camera_ctx.p_meta_cb) {
-            p_stats_fps->valuedouble = total_frames * 1000.f / (float)total_frame_time_ms;
+            p_stats_fps->valuedouble = (total_frames * 1000000.f) / total_frame_time_us;
             camera_ctx.p_meta_cb(p_meta_root, camera_ctx.p_cb_ctx);
-            if (total_frames % 5 == 0) {
-                total_frames = 0;
-                total_frame_time_ms = 0;
-            }
+        }
+        if (total_frames % 5 == 0) {
+            total_frames = 0;
+            total_frame_time_us = 0;
         }
     }
 }
