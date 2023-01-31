@@ -615,9 +615,24 @@
       xhr.send(JSON.stringify(json_data));
     });
 
+    function defaultCanvas() {
+      var defImg = new Image();
+      defImg.src = "https://cdn.wallpapersafari.com/87/35/BklEeh.jpg";
+
+      defImg.onload = function() {
+        var canvas = document.getElementById("viewport");
+        var ctx = canvas.getContext("2d");
+
+        canvas.width = defImg.width;
+        canvas.height = defImg.height;
+        ctx.drawImage(defImg, 0, 0);
+      }
+    }
+
     window.addEventListener('load', () => {
       openTelemetrySocket();
-      fetchSettings('system', 'wifiForm')
+      fetchSettings('system', 'wifiForm');
+      defaultCanvas();
     });
 
   </script>
