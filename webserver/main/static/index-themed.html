@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
-<html lang="en" class="light-style layout-menu-fixed" dir="ltr" data-theme="theme-default" data-assets-path="https://maxlab-io-assets.web.app/ai-camera/"
-  data-template="vertical-menu-template-free">
+<html lang="en" class="light-style layout-menu-fixed" dir="ltr" data-theme="theme-default"
+  data-assets-path="https://maxlab-io-assets.web.app/ai-camera/" data-template="vertical-menu-template-free">
 
 <head>
   <meta charset="utf-8" />
@@ -26,15 +26,20 @@
   <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 
   <!-- Core CSS -->
-  <link rel="stylesheet" href="https://maxlab-io-assets.web.app/ai-camera/core.css" class="template-customizer-core-css" />
-  <link rel="stylesheet" href="https://maxlab-io-assets.web.app/ai-camera/theme-default.css" class="template-customizer-theme-css" />
+  <link rel="stylesheet" href="https://maxlab-io-assets.web.app/ai-camera/core.css"
+    class="template-customizer-core-css" />
+
+  <link rel="stylesheet" href="https://maxlab-io-assets.web.app/ai-camera/theme-default.css"
+    class="template-customizer-theme-css" />
 
   <!-- Vendors CSS -->
   <link href="
   https://cdn.jsdelivr.net/npm/perfect-scrollbar@1.5.5/css/perfect-scrollbar.min.css
   " rel="stylesheet" />
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.36.3/apexcharts.min.css" integrity="sha512-tJYqW5NWrT0JEkWYxrI4IK2jvT7PAiOwElIGTjALSyr8ZrilUQf+gjw2z6woWGSZqeXASyBXUr+WbtqiQgxUYg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.36.3/apexcharts.min.css"
+    integrity="sha512-tJYqW5NWrT0JEkWYxrI4IK2jvT7PAiOwElIGTjALSyr8ZrilUQf+gjw2z6woWGSZqeXASyBXUr+WbtqiQgxUYg=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
 
   <!-- Page CSS -->
 
@@ -341,11 +346,11 @@
                     <div class="row mb-2">
                       <div class="btn-group" role="group" aria-label="Basic example">
 
-                        <button type="button" class="btn btn-primary border-secondary">
+                        <button type="button" class="btn btn-primary border-secondary" id="playStream">
                           <i class='bx bx-play-circle'></i>
                         </button>
 
-                        <button type="button" class="btn btn-danger border-secondary"><i
+                        <button type="button" class="btn btn-danger border-secondary" id="stopStream"><i
                             class='bx bx-stop-circle'></i></button>
 
                         <button type="button" class="btn btn-secondary border-secondary"><i
@@ -358,9 +363,11 @@
 
                         <ul class="dropdown-menu">
 
-                          <li><a class="dropdown-item" href="javascript:void(0);">JPEG</a></li>
+                          <li><a class="dropdown-item" id="getJPEG" href="javascript:void(0);">JPEG</a></li>
 
-                          <li><a class="dropdown-item" href="javascript:void(0);">YUV422</a></li>
+                          <li><a class="dropdown-item" id="getYUV422" href="javascript:void(0);">YUV422</a></li>
+
+                          <li><a class="dropdown-item" id="getRGB565" href="javascript:void(0);">RGB565</a></li>
 
                         </ul>
 
@@ -413,13 +420,21 @@
   <!-- Core JS -->
   <!-- build:js assets/vendor/js/core.js -->
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.3/jquery.min.js" integrity="sha512-STof4xm1wgkfm7heWqFJVn58Hm3EtS31XFaagaa8VMReCXAkQnJZ+jEy8PCC/iT18dFy95WcExNHFTqLyp72eQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.3/jquery.min.js"
+    integrity="sha512-STof4xm1wgkfm7heWqFJVn58Hm3EtS31XFaagaa8VMReCXAkQnJZ+jEy8PCC/iT18dFy95WcExNHFTqLyp72eQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.6/umd/popper.min.js" integrity="sha512-6UofPqm0QupIL0kzS/UIzekR73/luZdC6i/kXDbWnLOJoqwklBK6519iUnShaYceJ0y4FaiPtX/hRnV/X/xlUQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.6/umd/popper.min.js"
+    integrity="sha512-6UofPqm0QupIL0kzS/UIzekR73/luZdC6i/kXDbWnLOJoqwklBK6519iUnShaYceJ0y4FaiPtX/hRnV/X/xlUQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.min.js" integrity="sha512-OvBgP9A2JBgiRad/mM36mkzXSXaJE9BEIENnVEmeZdITvwT09xnxLtT4twkCa8m/loMbPHsvPl0T8lRGVBwjlQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.min.js"
+    integrity="sha512-OvBgP9A2JBgiRad/mM36mkzXSXaJE9BEIENnVEmeZdITvwT09xnxLtT4twkCa8m/loMbPHsvPl0T8lRGVBwjlQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/perfect-scrollbar/1.5.5/perfect-scrollbar.min.js" integrity="sha512-X41/A5OSxoi5uqtS6Krhqz8QyyD8E/ZbN7B4IaBSgqPLRbWVuXJXr9UwOujstj71SoVxh5vxgy7kmtd17xrJRw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/perfect-scrollbar/1.5.5/perfect-scrollbar.min.js"
+    integrity="sha512-X41/A5OSxoi5uqtS6Krhqz8QyyD8E/ZbN7B4IaBSgqPLRbWVuXJXr9UwOujstj71SoVxh5vxgy7kmtd17xrJRw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
   <script src="https://maxlab-io-assets.web.app/ai-camera/menu.js"></script>
   <!-- endbuild -->
