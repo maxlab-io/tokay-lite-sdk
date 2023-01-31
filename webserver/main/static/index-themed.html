@@ -321,7 +321,7 @@
                           <table class="table table-sm table-hover">
                             <tr>
                               <th>Confidence level</th>
-                              <th>42</th>
+                              <th id="confidenceVal">42</th>
                             </tr>
                           </table>
                         </div>
@@ -340,7 +340,8 @@
                     <div class="row mb-2">
                       <div class="col-lg-12">
                         <!-- <img src="https://cdn.wallpapersafari.com/87/35/BklEeh.jpg" class="img-fluid w-100 rounded"> -->
-                        <canvas id="viewport" width="1600" height="1200" style="border:1px solid #d3d3d3;width:100%;height:600px;"/>
+                        <canvas id="viewport" width="1600" height="1200"
+                          style="border:1px solid #d3d3d3;width:100%;height:600px;" />
 
                       </div>
                     </div>
@@ -475,13 +476,24 @@
             }
             ctx.drawImage(frame, (canvas.width - frame.width) / 2, 0);
             URL.revokeObjectURL(image_url);
+
             ctx.font = "20px monospace";
-            ctx.fillText(`FPS: ${stream_metadata['fps'].toFixed(2)}`, 0, 20);
-            ctx.fillText(`Person score: ${stream_metadata['cnn_output']['person_score'].toFixed(2)}`, 0, 40);
-            ctx.fillText(`No person score: ${stream_metadata['cnn_output']['no_person_score'].toFixed(2)}`, 0, 60);
+
+            $('#fpsVal').text(stream_metadata['fps'].toFixed(2));
+            $('#confidenceVal').text(stream_metadata['cnn_output']);
+            $('#fpsVal').text(stream_metadata['fps'].toFixed(2));
+            $('#confidenceVal').text(stream_metadata['cnn_output']['person_score'].toFixed(2));
+
           }
+
           frame.src = image_url;
         }
+      }
+
+      socket.onopen = function (event) {
+        $('#stopStream').click(() => {
+          socket.close()
+        });
       }
     }
 
@@ -507,10 +519,26 @@
       makeDownload("/image.rgb565");
     }
 
+    function openTelemetrySocket() {
+      let socket = new WebSocket("ws://" + location.host + "/telemetry");
+      socket.onmessage = function (event) {
+        const resp_json = JSON.parse(event.data);
+        for (let k in resp_json) {
+          $(`#${k}Val`).html(Number(resp_json[k].toFixed(2)));
+        }
+      }
+      socket.onopen = function (event) {
+      }
+    }
+
     $('#playStream').click(handlePlayStream);
     $('#getJPEG').click(handleGetJPEG);
     $('#getYUV422').click(handleGetYUV422);
     $('#getRGB565').click(handleGetRGB565);
+
+    window.addEventListener('load', () => {
+      openTelemetrySocket();
+    });
 
   </script>
 

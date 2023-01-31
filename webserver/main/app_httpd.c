@@ -54,7 +54,7 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
 static void telemetry_timer_cb(TimerHandle_t handle);
 static void send_telemetry(void *arg);
 
-extern const char index_html_start[] asm("_binary_index_html_start");
+extern const char index_html_start[] asm("_binary_index_themed_html_start");
 extern const char wifi_setup_html_start[] asm("_binary_wifi_setup_html_start");
 
 static const httpd_uri_t handler_index = {
