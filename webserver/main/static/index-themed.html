@@ -209,8 +209,8 @@
                           </div>
                           <div class="col-lg-8 mt-1 mb-4">
                             <div class="progress">
-                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" id="psramVal"
-                                role="progressbar" style="width: 20%" aria-valuenow="20" aria-valuemin="0"
+                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                id="psramVal" role="progressbar" style="width: 20%" aria-valuenow="20" aria-valuemin="0"
                                 aria-valuemax="100"></div>
                             </div>
                           </div>
@@ -225,8 +225,8 @@
                           </div>
                           <div class="col-lg-8 mt-1 mb-4">
                             <div class="progress">
-                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" id="dramVal"
-                                role="progressbar" style="width: 60%" aria-valuenow="20" aria-valuemin="0"
+                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                id="dramVal" role="progressbar" style="width: 60%" aria-valuenow="20" aria-valuemin="0"
                                 aria-valuemax="100"></div>
                             </div>
                           </div>
@@ -241,8 +241,8 @@
                           </div>
                           <div class="col-lg-8 mt-1 mb-4">
                             <div class="progress">
-                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" id="cpu0Val"
-                                role="progressbar" style="width: 88%" aria-valuenow="20" aria-valuemin="0"
+                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                id="cpu0Val" role="progressbar" style="width: 88%" aria-valuenow="20" aria-valuemin="0"
                                 aria-valuemax="100"></div>
                             </div>
                           </div>
@@ -257,8 +257,8 @@
                           </div>
                           <div class="col-lg-8 mt-1 mb-4">
                             <div class="progress">
-                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" id="cpu1Val"
-                                role="progressbar" style="width: 11%" aria-valuenow="20" aria-valuemin="0"
+                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                id="cpu1Val" role="progressbar" style="width: 11%" aria-valuenow="20" aria-valuemin="0"
                                 aria-valuemax="100"></div>
                             </div>
                           </div>
@@ -282,27 +282,27 @@
                           <table class="table table-sm table-hover">
                             <tr>
                               <th>MCU temperature</th>
-                              <th>42</th>
+                              <th id="tempVal">42</th>
                             </tr>
                             <tr>
                               <th>IR state</th>
-                              <th>active</th>
+                              <th id="irVal">active</th>
                             </tr>
                             <tr>
                               <th>Light, lux</th>
-                              <th>9990</th>
+                              <th id="lightVal">9990</th>
                             </tr>
                             <tr>
                               <th>Motion detection</th>
-                              <th>detected</th>
+                              <th id="motionVal">detected</th>
                             </tr>
                             <tr>
                               <th>Battery, voltage, mV</th>
-                              <th>3880</th>
+                              <th id="vbatVal">3880</th>
                             </tr>
                             <tr>
                               <th>FPS</th>
-                              <th>15</th>
+                              <th id="fpsVal">15</th>
                             </tr>
                           </table>
                         </div>
@@ -339,7 +339,9 @@
 
                     <div class="row mb-2">
                       <div class="col-lg-12">
-                        <img src="https://cdn.wallpapersafari.com/87/35/BklEeh.jpg" class="img-fluid w-100 rounded">
+                        <!-- <img src="https://cdn.wallpapersafari.com/87/35/BklEeh.jpg" class="img-fluid w-100 rounded"> -->
+                        <canvas id="viewport" width="1600" height="1200" style="border:1px solid #d3d3d3;width:100%;height:600px;"/>
+
                       </div>
                     </div>
 
@@ -444,6 +446,74 @@
 
   <!-- Place this tag in your head or just before your close body tag. -->
   <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+
+  <script type="text/javascript">
+
+    function handlePlayStream() {
+      var stream_metadata = null;
+      let socket = new WebSocket("ws://" + location.host + "/stream");
+      socket.binaryType = "blob";
+      socket.onmessage = (event) => {
+        if (typeof event.data === "string") {
+          stream_metadata = JSON.parse(event.data);
+          var canvas = document.getElementById("viewport");
+          var ctx = canvas.getContext("2d");
+        } else {
+          const image_url = window.URL.createObjectURL(event.data);
+          const frame = new Image();
+          frame.onload = () => {
+            var canvas = document.getElementById("viewport");
+            var ctx = canvas.getContext("2d");
+            const height = frame.height;
+            const width = canvas.clientWidth * (height / canvas.clientHeight);
+            if (canvas.height != height) {
+              canvas.height = height;
+            }
+            if (canvas.width != width) {
+              canvas.width = width;
+            }
+            ctx.drawImage(frame, (canvas.width - frame.width) / 2, 0);
+            URL.revokeObjectURL(image_url);
+            ctx.font = "20px monospace";
+            ctx.fillText(`FPS: ${stream_metadata['fps'].toFixed(2)}`, 0, 20);
+            ctx.fillText(`Person score: ${stream_metadata['cnn_output']['person_score'].toFixed(2)}`, 0, 40);
+            ctx.fillText(`No person score: ${stream_metadata['cnn_output']['no_person_score'].toFixed(2)}`, 0, 60);
+          }
+          frame.src = image_url;
+        }
+      }
+    }
+
+    function makeDownload(file_path) {
+      var a = document.createElement('A');
+      a.href = file_path;
+      a.target = "blank";
+      a.download = file_path.substr(file_path.lastIndexOf('/') + 1);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function handleGetJPEG() {
+      makeDownload("/image.jpg");
+    }
+
+    function handleGetYUV422() {
+      makeDownload("/image.yuv422");
+    }
+
+    function handleGetRGB565() {
+      makeDownload("/image.rgb565");
+    }
+
+    $('#playStream').click(handlePlayStream);
+    $('#getJPEG').click(handleGetJPEG);
+    $('#getYUV422').click(handleGetYUV422);
+    $('#getRGB565').click(handleGetRGB565);
+
+  </script>
+
 </body>
 
 </html>
