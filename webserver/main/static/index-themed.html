@@ -41,6 +41,10 @@
     integrity="sha512-tJYqW5NWrT0JEkWYxrI4IK2jvT7PAiOwElIGTjALSyr8ZrilUQf+gjw2z6woWGSZqeXASyBXUr+WbtqiQgxUYg=="
     crossorigin="anonymous" referrerpolicy="no-referrer" />
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonform/2.2.5/jsonform.js"
+    integrity="sha512-7+/iHAMg7Yn0B7v6kbWoZYGstHvUeehAe0Rd77bndsvA0jk5z7fQt0qagSyvCRrr6pCBVDUUZlIXlcVhSv2l6g=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
   <!-- Page CSS -->
 
   <!-- Helpers -->
@@ -77,20 +81,21 @@
               <div>WiFi Setup</div>
             </a>
 
-            <form class="menu-sub">
+            <form class="menu-sub" id="wifiForm">
               <ul class="list-unstyled">
                 <li class="menu-link">
 
-                  <input type="text" class="form-control" id="wifi_ssid" placeholder="SSID" />
+                  <input type="text" class="form-control" id="wifi_ssid" name="wifi_ssid" placeholder="SSID" />
 
                 </li>
                 <li class="menu-link">
 
-                  <input type="password" class="form-control" id="wifi_pass" placeholder="Password" />
+                  <input type="password" class="form-control" name="wifi_password" id="wifi_password"
+                    placeholder="Password" />
 
                 </li>
                 <li class="menu-link">
-                  <button type="submit" class="btn btn-primary w-100">Connect</button>
+                  <button type="submit" class="btn btn-primary w-100" id="wifi_submit">Connect</button>
                 </li>
               </ul>
             </form>
@@ -191,6 +196,20 @@
 
           <!-- Content -->
           <div class="container-xxl flex-grow-1 container-p-y">
+
+
+            <!-- Toast with Placements -->
+            <div class="bs-toast toast toast-placement-ex m-2 fade bg-success top-0 start-50 translate-middle-x"
+              role="alert" aria-live="assertive" aria-atomic="true" data-delay="10000" id="wifiToast">
+              <div class="toast-header">
+                <i class="bx bx-bell me-2"></i>
+                <div class="me-auto fw-semibold">WiFi Settings Applied</div>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+              </div>
+              <div class="toast-body">WiFi settings applied. Please reload the page</div>
+            </div>
+            <!-- Toast with Placements -->
+
 
             <div class="row mb-4">
 
@@ -417,6 +436,7 @@
 
   <!-- Overlay -->
   <div class="layout-overlay layout-menu-toggle"></div>
+
   </div>
   <!-- / Layout wrapper -->
 
@@ -544,13 +564,60 @@
       }
     }
 
+    function fetchSettings(category, form) {
+      let xhr = new XMLHttpRequest();
+      xhr.open("GET", `/settings/${category}`);
+      xhr.setRequestHeader("Accept", "application/json");
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.onload = () => {
+        resp_json = JSON.parse(xhr.responseText);
+        for (let k in resp_json) {
+          let elem = $(`#${k}`);
+          if (elem) {
+            if (elem.attr('type') === 'password') {
+              /* Or what? */
+              elem.val('********');
+            } else {
+              elem.val(resp_json[k]);
+            }
+          }
+        }
+      }
+      xhr.send(null);
+    }
+
+    function objectifyForm(formArray) {
+      var ret = {};
+      for (var i = 0; i < formArray.length; i++) {
+        ret[formArray[i]['name']] = formArray[i]['value'];
+      }
+      return ret;
+    }
+
     $('#playStream').click(handlePlayStream);
     $('#getJPEG').click(handleGetJPEG);
     $('#getYUV422').click(handleGetYUV422);
     $('#getRGB565').click(handleGetRGB565);
+    $('#wifiForm').submit(function (ev) {
+      let toast = $('#wifiToast');
+      toast_place = new bootstrap.Toast(toast);
+      toast_place.show();
+      ev.preventDefault();
+
+
+      let xhr = new XMLHttpRequest();
+      let data = $('#wifiForm').serializeArray();
+      let json_data = objectifyForm(data);
+
+      xhr.open("POST", "/settings/system");
+      xhr.setRequestHeader("Accept", "application/json");
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.send(JSON.stringify(json_data));
+    });
 
     window.addEventListener('load', () => {
       openTelemetrySocket();
+      fetchSettings('system', 'wifiForm')
     });
 
   </script>
