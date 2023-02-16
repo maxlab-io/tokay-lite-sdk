@@ -24,6 +24,7 @@ void pir_init(pir_callback_t pir_cb, void *p_ctx)
     io_conf.pin_bit_mask = (1LLU << PIR_CTRL_D_PIN) | (1LLU << PIR_CTRL_LE_PIN);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
+    gpio_config(&io_conf);
 
     pir_enable();
 }

@@ -13,6 +13,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
+#include "ext_rtc.h"
+
 #define BATT_DETECT_ADC_CHANNEL  ADC_CHANNEL_0 // GPIO1
 #define BATT_DETECT_MV_TO_BATT_MV(x) (x * 2)
 
@@ -76,6 +78,10 @@ void bsp_init(void (*usr_button_cb)(void))
 
     temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
     ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor_config, &temp_sensor));
+
+    if (!ext_rtc_init(BSP_I2C_BUS_ID)) {
+        ESP_LOGE(TAG, "Failed to initialize RTC");
+    }
 }
 
 uint32_t bsp_read_vbat(void)
@@ -92,6 +98,29 @@ void bsp_temp_sensor_read(float *p_out)
     ESP_ERROR_CHECK(temperature_sensor_enable(temp_sensor));
     ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, p_out));
     ESP_ERROR_CHECK(temperature_sensor_disable(temp_sensor));
+}
+
+bool bsp_deep_sleep(uint32_t sleep_duration_seconds)
+{
+    if (!ext_rtc_clear_alarm_flag()) {
+        ESP_LOGE(TAG, "Failed to clear RTC alarm");
+        return false;
+    }
+
+    if (sleep_duration_seconds < UINT32_MAX) {
+        if (!ext_rtc_set_alarm(sleep_duration_seconds)) {
+            ESP_LOGE(TAG, "Failed to set RTC alarm");
+            return false;
+        }
+    }
+
+    ESP_LOGI(TAG, "Shutting down");
+
+    ESP_ERROR_CHECK(gpio_set_level(PWR_EN_PIN, 0));
+
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    return true;
 }
 
 int8_t apds9306_i2c_read(uint8_t address, uint8_t reg, uint8_t *data, uint16_t count)
