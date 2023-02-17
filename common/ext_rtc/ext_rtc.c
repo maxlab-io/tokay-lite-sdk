@@ -21,27 +21,19 @@
 
 static int pcf_i2c_bus_id;
 
-static bool write_reg(uint8_t dev_addr, uint8_t addr, uint8_t data);
-static bool read_reg(uint8_t dev_addr, uint8_t addr, uint8_t *p_data);
-static bool probe(uint8_t addr);
+static bool write_reg(uint8_t addr, uint8_t data);
+static bool read_reg(uint8_t addr, uint8_t *p_data);
 
 bool ext_rtc_init(int i2c_bus_id)
 {
     pcf_i2c_bus_id = i2c_bus_id;
-    /*
-    for (int i = 0; i < 128; i++) {
-        if (probe(i)) {
-            printf("found @ %02x\r\n", i);
-        }
-    }
-    */
     return ext_rtc_check();
 }
 
 bool ext_rtc_check(void)
 {
     uint8_t control1;
-    return read_reg(PCF_ADDR, REG_CONTROL1, &control1);
+    return read_reg(REG_CONTROL1, &control1);
 }
 
 bool ext_rtc_set_alarm(int sec)
@@ -60,40 +52,40 @@ bool ext_rtc_set_alarm(int sec)
     const uint8_t alarm_minutes = (minutes_duration % 10) | ((minutes_duration / 10) << 4);
     const uint8_t alarm_seconds = (seconds_duration % 10) | ((seconds_duration / 10) << 4);
 
-    if (!write_reg(PCF_ADDR, REG_CONTROL1, control1)) {
+    if (!write_reg(REG_CONTROL1, control1)) {
         return false;
     }
 
-    if (!write_reg(PCF_ADDR, REG_SECONDS, seconds)) {
+    if (!write_reg(REG_SECONDS, seconds)) {
         return false;
     }
 
-    if (!write_reg(PCF_ADDR, REG_MINUTES, minutes)) {
+    if (!write_reg(REG_MINUTES, minutes)) {
         return false;
     }
 
-    if (!write_reg(PCF_ADDR, REG_HOURS, hours)) {
+    if (!write_reg(REG_HOURS, hours)) {
         return false;
     }
 
-    if (!write_reg(PCF_ADDR, REG_ALM_SECONDS, alarm_seconds)) {
+    if (!write_reg(REG_ALM_SECONDS, alarm_seconds)) {
         return false;
     }
 
-    if (!write_reg(PCF_ADDR, REG_ALM_MINUTES, alarm_minutes)) {
+    if (!write_reg(REG_ALM_MINUTES, alarm_minutes)) {
         return false;
     }
 
-    if (!write_reg(PCF_ADDR, REG_ALM_HOURS, alarm_hours)) {
+    if (!write_reg(REG_ALM_HOURS, alarm_hours)) {
         return false;
     }
 
-    if (!write_reg(PCF_ADDR, REG_CONTROL2, control2)) {
+    if (!write_reg(REG_CONTROL2, control2)) {
         return false;
     }
 
     // Enable RTC
-    if (!write_reg(PCF_ADDR, REG_CONTROL1, 0)) {
+    if (!write_reg(REG_CONTROL1, 0)) {
         return false;
     }
 
@@ -103,7 +95,7 @@ bool ext_rtc_set_alarm(int sec)
 bool ext_rtc_alarm_active(bool *alarm_active)
 {
     uint8_t control2 = 0;
-    if (!read_reg(PCF_ADDR, REG_CONTROL2, &control2)) {
+    if (!read_reg(REG_CONTROL2, &control2)) {
         return false;
     }
 
@@ -114,29 +106,29 @@ bool ext_rtc_alarm_active(bool *alarm_active)
 bool ext_rtc_clear_alarm_flag(void)
 {
     uint8_t control2 = 0;
-    if (!read_reg(PCF_ADDR, REG_CONTROL2, &control2)) {
+    if (!read_reg(REG_CONTROL2, &control2)) {
         return false;
     }
 
     control2 &= ~CONTROL2_AF;
 
-    return write_reg(PCF_ADDR, REG_CONTROL2, control2);
+    return write_reg(REG_CONTROL2, control2);
 }
 
 bool ext_rtc_set_ram_byte(uint8_t data)
 {
-    return write_reg(PCF_ADDR, REG_RAM_BYTE, data);
+    return write_reg(REG_RAM_BYTE, data);
 }
 
 bool ext_rtc_get_ram_byte(uint8_t *data)
 {
-    return read_reg(PCF_ADDR, REG_RAM_BYTE, data);
+    return read_reg(REG_RAM_BYTE, data);
 }
 
-static bool write_reg(uint8_t dev_addr, uint8_t addr, uint8_t val)
+static bool write_reg(uint8_t addr, uint8_t val)
 {
     uint8_t buf[3];
-    buf[0] = (dev_addr << 1) | I2C_MASTER_WRITE;
+    buf[0] = (PCF_ADDR << 1) | I2C_MASTER_WRITE;
     buf[1] = addr;
     buf[2] = val;
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
@@ -152,10 +144,10 @@ static bool write_reg(uint8_t dev_addr, uint8_t addr, uint8_t val)
     return true;
 }
 
-static bool read_reg(uint8_t dev_addr, uint8_t addr, uint8_t *data)
+static bool read_reg(uint8_t addr, uint8_t *data)
 {
     uint8_t buf[2]={0};
-    buf[0]=(dev_addr << 1) | I2C_MASTER_WRITE;
+    buf[0]=(PCF_ADDR << 1) | I2C_MASTER_WRITE;
     buf[1]= addr;
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
@@ -177,18 +169,5 @@ static bool read_reg(uint8_t dev_addr, uint8_t addr, uint8_t *data)
         return false;
     }
     i2c_cmd_link_delete(cmd);
-    return 1;
-}
-
-static bool probe(uint8_t addr)
-{
-    int ret;
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, 1);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(pcf_i2c_bus_id, cmd, pdMS_TO_TICKS(100));
-    i2c_cmd_link_delete(cmd);
-
-    return ret == ESP_OK;
+    return true;
 }
