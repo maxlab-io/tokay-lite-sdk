@@ -31,7 +31,7 @@ void pir_init(pir_callback_t pir_cb, void *p_ctx)
 
 bool pir_is_motion_detected(void)
 {
-    return gpio_get_level(PIR_OUT_PIN);
+    return 0 == gpio_get_level(PIR_OUT_PIN);
 }
 
 void pir_enable(void)
