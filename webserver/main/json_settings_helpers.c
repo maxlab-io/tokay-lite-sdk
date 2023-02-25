@@ -27,10 +27,10 @@ cJSON *json_settings_load_from_nvs(const char *p_category)
         xSemaphoreGive(nvs_mutex);
         return NULL;
     }
-    size_t settings_size;
+    size_t settings_size = 0;
     err = nvs_get_blob(nvs_handle, p_category, NULL, &settings_size);
     char* settings_buf = NULL;
-    if (ESP_ERR_NVS_INVALID_LENGTH == err) {
+    if (ESP_OK == err) {
         settings_buf = malloc(settings_size);
         err = nvs_get_blob(nvs_handle, p_category, settings_buf, &settings_size);
         if (ESP_OK != err) {
@@ -42,6 +42,8 @@ cJSON *json_settings_load_from_nvs(const char *p_category)
             }
         }
         free(settings_buf);
+    } else {
+        ESP_LOGE(TAG, "Failed to read \"%s\" settings from NVS: %s", p_category, esp_err_to_name(err));
     }
 
     nvs_close(nvs_handle);

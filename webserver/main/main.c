@@ -51,6 +51,7 @@ void app_main(void)
     json_settings_helpers_init();
     p_system_settings = json_settings_load_from_nvs("system");
     if (NULL == p_system_settings) {
+        ESP_LOGE(TAG, "Failed to load system settings from NVS");
         p_system_settings = system_settings_make_default();
         json_settings_save_to_nvs("system", p_system_settings);
     }
