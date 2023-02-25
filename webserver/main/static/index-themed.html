@@ -60,13 +60,25 @@
       <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
         <div class="menu-inner-shadow"></div>
 
-        <ul class="menu-inner py-1">
+        <ul class="menu-inner py-1 nav nav-tabs" id="configTab" role="tablist">
 
-          <!-- Dashboard -->
-          <li class="menu-item active">
-            <a href="index.html" class="menu-link">
-              <i class="menu-icon tf-icons bx bx-target-lock"></i>
-              <div data-i18n="Analytics">Dashboard</div>
+          <li class="menu-header small text-uppercase">
+            <span class="menu-header-text">System</span>
+          </li>
+
+          <!-- Info -->
+          <li class="menu-item nav-link active" data-bs-target="#tab-info" data-bs-toggle="tab">
+            <a href="javascript:void(0);" class="menu-link">
+              <i class="menu-icon tf-icons bx bx-info-circle"></i>
+              <div>Info</div>
+            </a>
+          </li>
+
+          <!-- Stats -->
+          <li class="menu-item nav-link" data-bs-target="#tab-stats" data-bs-toggle="tab">
+            <a href="javascript:void(0);" class="menu-link">
+              <i class="menu-icon tf-icons bx bx-line-chart"></i>
+              <div>Stats</div>
             </a>
           </li>
 
@@ -75,38 +87,26 @@
           </li>
 
           <!-- Wifi -->
-          <li class="menu-item">
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
+          <li class="menu-item nav-link" data-bs-target="#tab-wifi" data-bs-toggle="tab">
+            <a href="javascript:void(0);" class="menu-link">
               <i class="menu-icon tf-icons bx bx-wifi"></i>
               <div>WiFi Setup</div>
             </a>
-
-            <form class="menu-sub" id="wifiForm">
-              <ul class="list-unstyled">
-                <li class="menu-link">
-
-                  <input type="text" class="form-control" id="wifi_ssid" name="wifi_ssid" placeholder="SSID" />
-
-                </li>
-                <li class="menu-link">
-
-                  <input type="password" class="form-control" name="wifi_password" id="wifi_password"
-                    placeholder="Password" />
-
-                </li>
-                <li class="menu-link">
-                  <button type="submit" class="btn btn-primary w-100" id="wifi_submit">Connect</button>
-                </li>
-              </ul>
-            </form>
-
           </li>
 
-          <!-- Image Sensor -->
-          <li class="menu-item">
+          <!-- Camera -->
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-image-sensor">
             <a href="javascript:void(0);" class="menu-link">
-              <i class="menu-icon tf-icons bx bxs-camera"></i>
-              <div>Sensor Preferences</div>
+              <i class="menu-icon tf-icons bx bx-camera"></i>
+              <div>Camera config</div>
+            </a>
+          </li>
+
+          <!-- Autonomous mode -->
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-autonomous-mode">
+            <a href="javascript:void(0);" class="menu-link">
+              <i class="menu-icon tf-icons bx bxs-cog"></i>
+              <div>Autonomous mode</div>
             </a>
           </li>
 
@@ -114,8 +114,16 @@
             <span class="menu-header-text">Integrations</span>
           </li>
 
+          <!-- TF models -->
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-models">
+            <a href="javascript:void(0);" class="menu-link">
+              <i class="menu-icon tf-icons bx bxs-network-chart"></i>
+              <div>TFLite models</div>
+            </a>
+          </li>
+
           <!-- Edge Impulse -->
-          <li class="menu-item">
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-edge-impulse">
             <a href="javascript:void(0);" class="menu-link">
               <i class="menu-icon tf-icons">
                 <img src="https://maxlab-io-assets.web.app/ai-camera/edge_impulse.svg" style="filter: grayscale(100%);">
@@ -125,7 +133,7 @@
           </li>
 
           <!-- Dropbox -->
-          <li class="menu-item">
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-dropbox">
             <a href="javascript:void(0);" class="menu-link">
               <i class="menu-icon tf-icons bx bxl-dropbox"></i>
               <div>Dropbox</div>
@@ -133,7 +141,7 @@
           </li>
 
           <!-- ThingsBoard -->
-          <li class="menu-item">
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-thingsboard">
             <a href="javascript:void(0);" class="menu-link">
               <i class="menu-icon tf-icons bx">
                 <img src="https://maxlab-io-assets.web.app/ai-camera/tb.svg"
@@ -144,7 +152,7 @@
           </li>
 
           <!-- AWS S3 -->
-          <li class="menu-item">
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-aws-s3">
             <a href="javascript:void(0);" class="menu-link">
               <i class="menu-icon tf-icons bx bxl-aws"></i>
               <div>AWS S3</div>
@@ -152,7 +160,7 @@
           </li>
 
           <!-- Plain HTTP -->
-          <li class="menu-item">
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-http">
             <a href="javascript:void(0);" class="menu-link">
               <i class="menu-icon tf-icons bx bx-link-alt"></i>
               <div>Generic HTTP</div>
@@ -160,43 +168,24 @@
           </li>
 
           <!-- Plain MQTT -->
-          <li class="menu-item">
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-mqtt">
             <a href="javascript:void(0);" class="menu-link">
               <i class="menu-icon tf-icons bx bx-link-alt"></i>
               <div>Generic MQTT</div>
-            </a>
-          </li>
-
+             </a>
+           </li>
         </ul>
       </aside>
       <!-- / Menu -->
 
       <!-- Layout container -->
       <div class="layout-page">
-        <!-- Navbar -->
-
-        <nav class="layout-navbar container-xxl navbar navbar-expand-xl navbar-detached align-items-center"
-          id="layout-navbar">
-          <div class="layout-menu-toggle navbar-nav align-items-xl-center me-3 me-xl-0 d-xl-none">
-            <a class="nav-item nav-link px-0 me-xl-4" href="javascript:void(0)">
-              <i class="bx bx-menu bx-sm"></i>
-            </a>
-          </div>
-
-          <a class="navbar-brand" href="https://maxlab.io">
-            <img src="https://maxlab-io-assets.web.app/ai-camera/maxlab.png" height="42">
-          </a>
-
-        </nav>
-
-        <!-- / Navbar -->
 
         <!-- Content wrapper -->
         <div class="content-wrapper">
 
           <!-- Content -->
           <div class="container-xxl flex-grow-1 container-p-y">
-
 
             <!-- Toast with Placements -->
             <div class="bs-toast toast toast-placement-ex m-2 fade bg-success top-0 start-50 translate-middle-x"
@@ -210,150 +199,281 @@
             </div>
             <!-- Toast with Placements -->
 
-
             <div class="row mb-4">
 
+              <!-- Tab area -->
               <div class="col-md-4">
+                    <div class="tab-content" id="configTabContent">
 
-                <div class="row mb-4">
-                  <div class="col-md-12">
-                    <div class="card">
-                      <h5 class="card-header">CPU and Memory</h5>
-                      <div class="card-body">
-
-
-                        <div class="row">
-                          <div class="col-lg-2 text-nowrap">
-                            <p>PSRAM</p>
+                      <!-- info tab -->
+                      <div class="tab-pane fade show active" id="tab-info" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">Info</h5>
+                          <div class="card-body">
                           </div>
-                          <div class="col-lg-8 mt-1 mb-4">
-                            <div class="progress">
-                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
-                                id="psramValBar" role="progressbar" style="width: 15%" aria-valuenow="20"
-                                aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                      </div>
+                      <!-- / info tab -->
+
+                      <!-- stats tab -->
+                      <div class="tab-pane fade" id="tab-stats" role="tabpanel">
+                        <div class="col">
+                          <div class="row mb-3">
+                            <div class="card">
+                            <h5 class="card-header">CPU and Memory</h5>
+                            <div class="card-body">
+                                <div class="row">
+                                <div class="col-lg-2 text-nowrap">
+                                    <p>PSRAM</p>
+                                </div>
+                                <div class="col-lg-8 mt-1 mb-4">
+                                    <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                        id="psramValBar" role="progressbar" style="width: 15%" aria-valuenow="20"
+                                        aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 text-nowrap">
+                                    <p id="psramVal">-</p>
+                                </div>
+                                </div>
+
+                                <div class="row">
+                                <div class="col-lg-2 text-nowrap">
+                                    <p>DRAM</p>
+                                </div>
+                                <div class="col-lg-8 mt-1 mb-4">
+                                    <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                        id="dramValBar" role="progressbar" style="width: 15%" aria-valuenow="20"
+                                        aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 text-nowrap">
+                                    <p id="dramVal">-</p>
+                                </div>
+                                </div>
+
+                                <div class="row">
+                                <div class="col-lg-2 text-nowrap">
+                                    <p>CPU0</p>
+                                </div>
+                                <div class="col-lg-8 mt-1 mb-4">
+                                    <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                        id="cpu0ValBar" role="progressbar" style="width: 15%" aria-valuenow="20"
+                                        aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 text-nowrap">
+                                    <p id="cpu0Val">- %</p>
+                                </div>
+                                </div>
+
+                                <div class="row">
+                                <div class="col-lg-2 text-nowrap">
+                                    <p>CPU1</p>
+                                </div>
+                                <div class="col-lg-8 mt-1 mb-4">
+                                    <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                        id="cpu1ValBar" role="progressbar" style="width: 15%" aria-valuenow="20"
+                                        aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 text-nowrap">
+                                    <p id="cpu1Val">- %</p>
+                                </div>
+                                </div>
+
                             </div>
-                          </div>
-                          <div class="col-lg-2 text-nowrap">
-                            <p id="psramVal">-</p>
+                            </div>
                           </div>
                         </div>
 
-                        <div class="row">
-                          <div class="col-lg-2 text-nowrap">
-                            <p>DRAM</p>
-                          </div>
-                          <div class="col-lg-8 mt-1 mb-4">
-                            <div class="progress">
-                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
-                                id="dramValBar" role="progressbar" style="width: 15%" aria-valuenow="20"
-                                aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="row mb-3">
+                            <div class="card">
+                            <h5 class="card-header">System State</h5>
+
+                            <div class="card-body">
+                                <div class="table-responsive text-nowrap">
+                                <table class="table table-sm table-hover">
+                                    <tr>
+                                    <th>MCU temperature</th>
+                                    <th id="tempVal">-</th>
+                                    </tr>
+                                    <tr>
+                                    <th>IR state</th>
+                                    <th id="irVal">-</th>
+                                    </tr>
+                                    <tr>
+                                    <th>Light, lux</th>
+                                    <th id="lightVal">-</th>
+                                    </tr>
+                                    <tr>
+                                    <th>Motion detection</th>
+                                    <th id="motionVal">-</th>
+                                    </tr>
+                                    <tr>
+                                    <th>Battery, voltage, mV</th>
+                                    <th id="vbatVal">-</th>
+                                    </tr>
+                                    <tr>
+                                    <th>FPS</th>
+                                    <th id="fpsVal">-</th>
+                                    </tr>
+                                </table>
+                                </div>
                             </div>
-                          </div>
-                          <div class="col-lg-2 text-nowrap">
-                            <p id="dramVal">-</p>
-                          </div>
+                            </div>
                         </div>
 
-                        <div class="row">
-                          <div class="col-lg-2 text-nowrap">
-                            <p>CPU0</p>
-                          </div>
-                          <div class="col-lg-8 mt-1 mb-4">
-                            <div class="progress">
-                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                                id="cpu0ValBar" role="progressbar" style="width: 15%" aria-valuenow="20"
-                                aria-valuemin="0" aria-valuemax="100"></div>
-                            </div>
-                          </div>
-                          <div class="col-lg-2 text-nowrap">
-                            <p id="cpu0Val">- %</p>
-                          </div>
-                        </div>
+                        <div class="row mb-3">
+                            <div class="card">
+                            <h5 class="card-header">AI Data</h5>
 
-                        <div class="row">
-                          <div class="col-lg-2 text-nowrap">
-                            <p>CPU1</p>
-                          </div>
-                          <div class="col-lg-8 mt-1 mb-4">
-                            <div class="progress">
-                              <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                                id="cpu1ValBar" role="progressbar" style="width: 15%" aria-valuenow="20"
-                                aria-valuemin="0" aria-valuemax="100"></div>
+                            <div class="card-body">
+                                <div class="table-responsive text-nowrap">
+                                <table class="table table-sm table-hover">
+                                    <tr>
+                                    <th>Confidence level</th>
+                                    <th id="confidenceVal">-</th>
+                                    </tr>
+                                </table>
+                                </div>
                             </div>
-                          </div>
-                          <div class="col-lg-2 text-nowrap">
-                            <p id="cpu1Val">- %</p>
-                          </div>
+                            </div>
                         </div>
 
                       </div>
-                    </div>
-                  </div>
-                </div>
+                      <!-- / stats tab -->
 
-                <div class="row mb-4">
-                  <div class="col-md-12">
-                    <div class="card">
-                      <h5 class="card-header">System State</h5>
+                      <!-- wifi tab -->
+                      <div class="tab-pane fade" id="tab-wifi" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">WiFi Setup</h5>
+                          <div class="card-body">
+                            <form id="wifiForm">
+                              <div class="form-group">
+                                  <ul class="list-unstyled">
+                                  <li class="menu-link">
 
-                      <div class="card-body">
-                        <div class="table-responsive text-nowrap">
-                          <table class="table table-sm table-hover">
-                            <tr>
-                              <th>MCU temperature</th>
-                              <th id="tempVal">-</th>
-                            </tr>
-                            <tr>
-                              <th>IR state</th>
-                              <th id="irVal">-</th>
-                            </tr>
-                            <tr>
-                              <th>Light, lux</th>
-                              <th id="lightVal">-</th>
-                            </tr>
-                            <tr>
-                              <th>Motion detection</th>
-                              <th id="motionVal">-</th>
-                            </tr>
-                            <tr>
-                              <th>Battery, voltage, mV</th>
-                              <th id="vbatVal">-</th>
-                            </tr>
-                            <tr>
-                              <th>FPS</th>
-                              <th id="fpsVal">-</th>
-                            </tr>
-                          </table>
+                                  <input type="text" class="form-control mb-2" id="wifi_ssid" name="wifi_ssid" placeholder="SSID" />
+
+                                  </li>
+                                  <li class="menu-link">
+
+                                  <input type="password" class="form-control mb-2" name="wifi_password" id="wifi_password"
+                                      placeholder="Password" />
+
+                                  </li>
+                                  <li class="menu-link">
+                                  <button type="submit" class="btn btn-primary w-100" id="wifi_submit">Connect</button>
+                                  </li>
+                                  </ul>
+                              </div>
+                            </form>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
+                      <!-- / wifi tab -->
 
-                <div class="row mb-4">
-                  <div class="col-md-12">
-                    <div class="card">
-                      <h5 class="card-header">AI Data</h5>
-
-                      <div class="card-body">
-                        <div class="table-responsive text-nowrap">
-                          <table class="table table-sm table-hover">
-                            <tr>
-                              <th>Confidence level</th>
-                              <th id="confidenceVal">-</th>
-                            </tr>
-                          </table>
+                      <!-- image sensor tab -->
+                      <div class="tab-pane fade" id="tab-image-sensor" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">Camera config</h5>
+                          <div class="card-body">
+                          </div>
                         </div>
                       </div>
+                      <!-- / image sensor tab -->
+
+                      <!-- autonomous mode tab -->
+                      <div class="tab-pane fade" id="tab-autonomous-mode" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">Autonomous mode</h5>
+                          <div class="card-body">
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / autonomous mode tab -->
+
+                      <!-- models tab -->
+                      <div class="tab-pane fade" id="tab-models" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">TFLite Models</h5>
+                          <div class="card-body">
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / models tab -->
+
+                      <!-- edge impulse tab -->
+                      <div class="tab-pane fade" id="tab-edge-impulse" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">Edge Impulse</h5>
+                          <div class="card-body">
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / edge impulse tab -->
+
+                      <!-- dropbox tab -->
+                      <div class="tab-pane fade" id="tab-dropbox" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">Dropbox</h5>
+                          <div class="card-body">
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / dropbox tab -->
+
+                      <!-- dropbox tab -->
+                      <div class="tab-pane fade" id="tab-thingsboard" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">ThingsBoard</h5>
+                          <div class="card-body">
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / thingsboard tab -->
+
+                      <!-- AWS S3 tab -->
+                      <div class="tab-pane fade" id="tab-aws-s3" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">AWS S3</h5>
+                          <div class="card-body">
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / AWS s3 tab -->
+
+                      <!-- HTTP tab -->
+                      <div class="tab-pane fade" id="tab-http" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">HTTP</h5>
+                          <div class="card-body">
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / HTTP tab -->
+
+                      <!-- MQTT tab -->
+                      <div class="tab-pane fade" id="tab-mqtt" role="tabpanel">
+                        <div class="card">
+                          <h5 class="card-header">MQTT</h5>
+                          <div class="card-body">
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / MQTT tab -->
+
                     </div>
-                  </div>
-                </div>
               </div>
+              <!-- / Tab area -->
 
-              <div class="col-md-8 big-box">
+              <div class="col-md-8">
                 <div class="card">
-                  <h5 class="card-header">Camera Stream</h5>
-
                   <div class="card-body">
 
                     <div class="row mb-2">
@@ -633,6 +753,14 @@
       openTelemetrySocket();
       fetchSettings('system', 'wifiForm');
       defaultCanvas();
+    });
+
+    $(document).on('click', '.nav-link.active', function() {
+        $('.active').removeClass('active');
+        const tab_id = $(this).attr("data-bs-target")
+        console.log(tab_id)
+        $(this).addClass('active')
+        $(tab_id).addClass('active')
     });
 
   </script>
