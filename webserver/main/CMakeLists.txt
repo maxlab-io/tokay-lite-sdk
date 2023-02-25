@@ -1,7 +1,8 @@
 idf_component_register(
   SRCS
-  main.c ai_camera.c config.c light_sensor.c pir.c bsp.c network.c
+  main.c ai_camera.c light_sensor.c pir.c bsp.c network.c
   app_httpd.c ai_pipeline.cpp person_detect_model_data.cc
+  json_settings_helpers.c
 
   PRIV_REQUIRES
   esp32-camera esp_http_server json nvs_flash esp_adc tflite-lib

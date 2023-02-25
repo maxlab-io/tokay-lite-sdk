@@ -16,6 +16,7 @@
 #include "config.h"
 #include "light_sensor.h"
 #include "ai_pipeline.h"
+#include "json_settings_helpers.h"
 
 #define CAM_PIN_PWDN   9
 #define CAM_PIN_RESET  11
@@ -51,38 +52,38 @@
 
 #define TAG "ai_camera"
 
-static config_desc_t config_desc[AI_CAMERA_CONFIG_MAX] = {
-    [AI_CAMERA_CONFIG_RESOLUTION] = { "resolution", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_CONTRAST ] = { "contrast", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_BRIGHTNESS] = { "brightness", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_SATURATION] = { "saturation", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_SHARPNESS] = { "sharpness", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_DENOISE] = { "denoise", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_GAINCEILING] = { "gainceiling", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_JPEG_QUALITY] = { "jpeg_quality", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_COLORBAR] = { "colorbar", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_WHITEBAL] = { "whitebal", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_GAIN_CTRL] = { "gain_ctrl", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_EXPOSURE_CTRL] = { "exposure_ctrl", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_HMIRROR] = { "hmirror", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_VFLIP] = { "vflip", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_AEC2] = { "aec2", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_AWB_GAIN] = { "awb_gain", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_AGC_GAIN] = { "agc_gain", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_AEC_VALUE] = { "aec_value", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_SPECIAL_EFFECT] = { "special_effect", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_WB_MODE] = { "wb_mode", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_AE_LEVEL] = { "ae_level", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_DCW] = { "dcw", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_BPC] = { "bpc", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_WPC] = { "wpc", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_RAW_GMA] = { "raw_gma", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_LENC] = { "lenc", CONFIG_TYPE_INT},
-    [AI_CAMERA_CONFIG_XCLK_FREQ] = { "xclk_freq", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_IR_MODE] = { "ir_mode", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = { "ir_light_thresh_high", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = { "ir_light_thresh_low", CONFIG_TYPE_INT },
-    [AI_CAMERA_CONFIG_IR_BRIGHTNESS] = { "ir_brightness", CONFIG_TYPE_INT },
+static const char *config_names[AI_CAMERA_CONFIG_MAX] = {
+    [AI_CAMERA_CONFIG_RESOLUTION] = "resolution",
+    [AI_CAMERA_CONFIG_CONTRAST ] = "contrast",
+    [AI_CAMERA_CONFIG_BRIGHTNESS] = "brightness",
+    [AI_CAMERA_CONFIG_SATURATION] = "saturation",
+    [AI_CAMERA_CONFIG_SHARPNESS] = "sharpness",
+    [AI_CAMERA_CONFIG_DENOISE] = "denoise",
+    [AI_CAMERA_CONFIG_GAINCEILING] = "gainceiling",
+    [AI_CAMERA_CONFIG_JPEG_QUALITY] = "jpeg_quality",
+    [AI_CAMERA_CONFIG_COLORBAR] = "colorbar",
+    [AI_CAMERA_CONFIG_WHITEBAL] = "whitebal",
+    [AI_CAMERA_CONFIG_GAIN_CTRL] = "gain_ctrl",
+    [AI_CAMERA_CONFIG_EXPOSURE_CTRL] = "exposure_ctrl",
+    [AI_CAMERA_CONFIG_HMIRROR] = "hmirror",
+    [AI_CAMERA_CONFIG_VFLIP] = "vflip",
+    [AI_CAMERA_CONFIG_AEC2] = "aec2",
+    [AI_CAMERA_CONFIG_AWB_GAIN] = "awb_gain",
+    [AI_CAMERA_CONFIG_AGC_GAIN] = "agc_gain",
+    [AI_CAMERA_CONFIG_AEC_VALUE] = "aec_value",
+    [AI_CAMERA_CONFIG_SPECIAL_EFFECT] = "special_effect",
+    [AI_CAMERA_CONFIG_WB_MODE] = "wb_mode",
+    [AI_CAMERA_CONFIG_AE_LEVEL] = "ae_level",
+    [AI_CAMERA_CONFIG_DCW] = "dcw",
+    [AI_CAMERA_CONFIG_BPC] = "bpc",
+    [AI_CAMERA_CONFIG_WPC] = "wpc",
+    [AI_CAMERA_CONFIG_RAW_GMA] = "raw_gma",
+    [AI_CAMERA_CONFIG_LENC] = "lenc",
+    [AI_CAMERA_CONFIG_XCLK_FREQ] = "xclk_freq",
+    [AI_CAMERA_CONFIG_IR_MODE] = "ir_mode",
+    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = "ir_light_thresh_high",
+    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = "ir_light_thresh_low",
+    [AI_CAMERA_CONFIG_IR_BRIGHTNESS] = "ir_brightness",
 };
 
 static int default_config[AI_CAMERA_CONFIG_MAX] = {
@@ -107,23 +108,16 @@ static int default_config[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_SPECIAL_EFFECT] = 0,
     [AI_CAMERA_CONFIG_WB_MODE] = 0,
     [AI_CAMERA_CONFIG_AE_LEVEL] = 0,
-    [AI_CAMERA_CONFIG_DCW] = 0,
-    [AI_CAMERA_CONFIG_BPC] = 0,
-    [AI_CAMERA_CONFIG_WPC] = 0,
+    [AI_CAMERA_CONFIG_DCW] = 1,
+    [AI_CAMERA_CONFIG_BPC] = 1,
+    [AI_CAMERA_CONFIG_WPC] = 1,
     [AI_CAMERA_CONFIG_RAW_GMA] = 0,
-    [AI_CAMERA_CONFIG_LENC] = 0,
+    [AI_CAMERA_CONFIG_LENC] = 1,
     [AI_CAMERA_CONFIG_XCLK_FREQ] = XCLK_DEFAULT_FREQ_HZ,
     [AI_CAMERA_CONFIG_IR_MODE] = AI_CAMERA_IR_MODE_AUTO,
-    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = 40,
-    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = 10,
-    [AI_CAMERA_CONFIG_IR_BRIGHTNESS] = 255,
-};
-
-static config_value_t config_values[AI_CAMERA_CONFIG_MAX];
-static config_ctx_t config_ctx = {
-    .num_vars = AI_CAMERA_CONFIG_MAX,
-    .p_desc = config_desc,
-    .p_values = config_values,
+    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = AI_CAMERA_IR_THRESH_HIGH_DEFAULT,
+    [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = AI_CAMERA_IR_THRESH_LOW_DEFAULT,
+    [AI_CAMERA_CONFIG_IR_BRIGHTNESS] = AI_CAMERA_IR_BRIGHTNESS_DEFAULT,
 };
 
 static camera_config_t camera_config = {
@@ -180,10 +174,10 @@ static struct {
     TaskHandle_t camera_thread;
     EventGroupHandle_t camera_thread_commands;
     ai_camera_stats_t stats;
+    cJSON *p_settings;
+    bool settings_require_restart;
 } camera_ctx;
 
-static void load_config(void);
-static void set_default_config(void);
 static void ir_cut_on(void);
 static void ir_cut_off(void);
 static void ir_leds_on(uint8_t duty);
@@ -194,11 +188,19 @@ static void update_ir_mode(void);
 static void ir_mode_timer_handler(TimerHandle_t timer);
 static void camera_thread_entry(void *pvParam);
 static void camera_thread_sleep(void);
+static cJSON *ai_camera_settings_get_default(void);
+static int ai_camera_settings_get_value(ai_camera_config_t config);
+static bool stop_camera_thread(TickType_t timeout_ticks);
+static void resume_camera_thread(void);
+static void set_sensor_settings(void);
 
 void ai_camera_init(int i2c_bus_id)
 {
-    set_default_config();
-    load_config();
+    camera_ctx.p_settings = json_settings_load_from_nvs("camera");
+    if (NULL == camera_ctx.p_settings) {
+        camera_ctx.p_settings = ai_camera_settings_get_default();
+        json_settings_save_to_nvs("camera", camera_ctx.p_settings);
+    }
 
     gpio_set_level(IRCUT_CTRL_PIN, 0);
     gpio_config_t io_conf = {};
@@ -243,14 +245,10 @@ void ai_camera_stop(void)
 
 camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
 {
-    if (!camera_ctx.running) {
+    if (camera_ctx.running) {
         return NULL;
     }
-    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
-    const EventBits_t bits = xEventGroupWaitBits(camera_ctx.camera_thread_commands,
-            (1 << CAMERA_CMD_RESP_STOP_DONE), pdTRUE, pdTRUE, timeout_ms);
-    if (0 == (bits & (1 << CAMERA_CMD_RESP_STOP_DONE))) {
-        xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
+    if (!stop_camera_thread(pdMS_TO_TICKS(5000))) {
         return NULL;
     }
     if (format != PIXFORMAT_JPEG) {
@@ -273,6 +271,7 @@ void ai_camera_fb_return(camera_fb_t *p_fb)
         camera_config.pixel_format = PIXFORMAT_JPEG;
         esp_camera_init(&camera_config);
     }
+    resume_camera_thread();
     xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
 }
 
@@ -291,113 +290,55 @@ float ai_camera_get_light_level(void)
     return camera_ctx.light_sensor_value;
 }
 
-const char *ai_camera_config_get_name(ai_camera_config_t config)
+void ai_camera_settings_set_json(const cJSON *p_settings)
 {
-    return config_get_name(&config_ctx, (int)config);
-}
-
-const void *ai_camera_config_get_value(ai_camera_config_t config)
-{
-    return config_get_value(&config_ctx, (int)config);
-}
-
-int ai_camera_config_get_value_int(ai_camera_config_t config)
-{
-    return (int)config_get_value(&config_ctx, (int)config);
-}
-
-void ai_camera_config_set_value(ai_camera_config_t config, const void *p_value)
-{
-    config_set_value(&config_ctx, (int)config, p_value);
-}
-
-void ai_camera_config_set_value_int(ai_camera_config_t config, int value)
-{
-    config_set_value(&config_ctx, (int)config, (void *)value);
-}
-
-ai_camera_config_t ai_camera_config_get_by_name(const char *name)
-{
-    return (int)config_get_by_name(&config_ctx, name);
-}
-
-config_type_t ai_camera_config_get_type(ai_camera_config_t config)
-{
-    return config_get_type(&config_ctx, (int)config);
-}
-
-void ai_camera_config_apply(void)
-{
-}
-
-void ai_camera_process_settings_json(const cJSON *p_settings)
-{
-    cJSON *p_cfg_val = NULL;
-    cJSON_ArrayForEach(p_cfg_val, p_settings)
-    {
-        ai_camera_config_t config = ai_camera_config_get_by_name(p_cfg_val->string);
-        if (AI_CAMERA_CONFIG_MAX == config) {
-            ESP_LOGE(TAG, "Unknown config variable %s", p_cfg_val->string);
-            continue;
-        }
-        switch (ai_camera_config_get_type(config)) {
-        case CONFIG_TYPE_STRING:
-            if (!cJSON_IsString(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
-                continue;
-            }
-            ai_camera_config_set_value(config, &p_cfg_val->valuestring);
-            break;
-        case CONFIG_TYPE_INT: {
-            if (!cJSON_IsNumber(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected number", p_cfg_val->string);
-                continue;
-            }
-            ai_camera_config_set_value_int(config, (int)p_cfg_val->valuedouble);
-            break;
-        }
-        default:
-            assert(0);
-            break;
-        }
+    if (cJSON_Compare(camera_ctx.p_settings, p_settings, false)) {
+        return;
     }
-}
-
-static void load_config(void)
-{
-    nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("config", NVS_READWRITE, &nvs_handle);
-    if (ESP_OK != err) {
-        ESP_LOGE(TAG, "Failed to open camera settings NVS namespace: %s", esp_err_to_name(err));
+    camera_ctx.settings_require_restart = false;
+    const pixformat_t current_res = ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION);
+    const pixformat_t new_res = json_settings_get_int_or(camera_ctx.p_settings,
+            config_names[AI_CAMERA_CONFIG_RESOLUTION], default_config[AI_CAMERA_CONFIG_RESOLUTION]);
+    if (current_res != new_res) {
+        camera_ctx.settings_require_restart = true;
     }
-    size_t settings_size;
-    err = nvs_get_str(nvs_handle, "ai_camera", NULL, &settings_size);
-    char* settings_buf = NULL;
-    if (ESP_ERR_NVS_INVALID_LENGTH == err) {
-        settings_buf = malloc(settings_size);
-        err = nvs_get_str(nvs_handle, "ai_camera", settings_buf, &settings_size);
-        if (ESP_OK != err) {
-            ESP_LOGE(TAG, "Failed to load camera settings JSON: %s", esp_err_to_name(err));
-        } else {
-            cJSON *p_settings = cJSON_ParseWithLength(settings_buf, settings_size);
-            if (p_settings == NULL) {
-                ESP_LOGE(TAG, "Failed to parse settings JSON");
-            } else {
-                ai_camera_process_settings_json(p_settings);
-                cJSON_Delete(p_settings);
-            }
-        }
-        free(settings_buf);
+    const int current_xclk = ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ);
+    const pixformat_t new_xclk = json_settings_get_int_or(camera_ctx.p_settings,
+            config_names[AI_CAMERA_CONFIG_XCLK_FREQ], default_config[AI_CAMERA_CONFIG_XCLK_FREQ]);
+    if (current_xclk != new_xclk) {
+        camera_ctx.settings_require_restart = true;
     }
 
-    nvs_close(nvs_handle);
+    cJSON_Delete(camera_ctx.p_settings);
+    camera_ctx.p_settings = cJSON_Duplicate(p_settings, true);
+    json_settings_save_to_nvs("camera", camera_ctx.p_settings);
 }
 
-static void set_default_config(void)
+const cJSON *ai_camera_settings_get_json(void)
 {
-    for (int i = 0; i < AI_CAMERA_CONFIG_MAX; i++) {
-        ai_camera_config_set_value_int(i, default_config[i]);
+    return camera_ctx.p_settings;
+}
+
+void ai_camera_settings_apply(void)
+{
+    if (!camera_ctx.running) {
+        camera_config.frame_size = ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION);
+        camera_config.xclk_freq_hz = ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ);
+        return;
     }
+    if (camera_ctx.settings_require_restart) {
+        if (!stop_camera_thread(pdMS_TO_TICKS(5000))) {
+            ESP_LOGE(TAG, "Failed to stop camera thread");
+            return;
+        }
+        camera_config.frame_size = ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION);
+        camera_config.xclk_freq_hz = ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ);
+        esp_camera_deinit();
+        esp_camera_init(&camera_config);
+    }
+
+    set_sensor_settings();
+    resume_camera_thread();
 }
 
 static void ir_cut_on(void)
@@ -449,22 +390,27 @@ static void ir_mode_day(void)
 static void ir_mode_night(void)
 {
     ir_cut_off();
-    ir_leds_on(ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_BRIGHTNESS));
+    ir_leds_on(ai_camera_settings_get_value(AI_CAMERA_CONFIG_IR_BRIGHTNESS));
 }
 
 static void update_ir_mode(void)
 {
+    const ai_camera_ir_mode_t ir_mode = ai_camera_settings_get_value(AI_CAMERA_CONFIG_IR_MODE);
+    const ai_camera_ir_mode_t ir_light_thresh_high =
+        ai_camera_settings_get_value(AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH);
+    const ai_camera_ir_mode_t ir_light_thresh_low =
+        ai_camera_settings_get_value(AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW);
     if (light_sensor_read(&camera_ctx.light_sensor_value)) {
-        if (ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_MODE) == AI_CAMERA_IR_MODE_AUTO) {
+        if (AI_CAMERA_IR_MODE_AUTO == ir_mode) {
             if (camera_ctx.light_sensor_value >
-                ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH)) {
+                ir_light_thresh_high) {
                 if (camera_ctx.ir_state != AI_CAMERA_IR_STATE_DAY) {
                     ESP_LOGI(TAG, "Switching to day");
                     ir_mode_day();
                     camera_ctx.ir_state = AI_CAMERA_IR_STATE_DAY;
                 }
             } else if (camera_ctx.light_sensor_value <
-                       ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW)) {
+                       ir_light_thresh_low) {
                 if (camera_ctx.ir_state != AI_CAMERA_IR_STATE_NIGHT) {
                     ESP_LOGI(TAG, "Switching to night");
                     ir_mode_night();
@@ -474,13 +420,12 @@ static void update_ir_mode(void)
         }
     }
 
-    if (ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_MODE) == AI_CAMERA_IR_MODE_DAY) {
+    if (ir_mode == AI_CAMERA_IR_MODE_DAY) {
         if (AI_CAMERA_IR_STATE_DAY != camera_ctx.ir_state) {
             ir_mode_day();
             camera_ctx.ir_state = AI_CAMERA_IR_STATE_DAY;
         }
-    }
-    if (ai_camera_config_get_value_int(AI_CAMERA_CONFIG_IR_MODE) == AI_CAMERA_IR_MODE_NIGHT) {
+    } else if (ir_mode == AI_CAMERA_IR_MODE_NIGHT) {
         if (AI_CAMERA_IR_STATE_NIGHT != camera_ctx.ir_state) {
             ir_mode_night();
             camera_ctx.ir_state = AI_CAMERA_IR_STATE_NIGHT;
@@ -501,6 +446,7 @@ static void camera_thread_entry(void *pvParam)
     if (ESP_OK != err) {
         ESP_LOGE(TAG, "Camera initialization failed: %s", esp_err_to_name(err));
     }
+    set_sensor_settings();
     ai_pipeline_init();
     cJSON *p_meta_root = cJSON_CreateObject();
     cJSON_AddItemToObject(p_meta_root, "cnn_output", ai_pipeline_get_results());
@@ -562,4 +508,127 @@ static void camera_thread_sleep(void)
     xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_RESP_STOP_DONE));
     xEventGroupWaitBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START),
             pdTRUE, pdTRUE, portMAX_DELAY);
+}
+
+static cJSON *ai_camera_settings_get_default(void)
+{
+    cJSON *p_root = cJSON_CreateObject();
+    if (NULL == p_root) {
+        return NULL;
+    }
+    for (int i = 0; i < AI_CAMERA_CONFIG_MAX; i++) {
+        cJSON_AddNumberToObject(p_root, config_names[i], default_config[i]);
+    }
+    return p_root;
+}
+
+static int ai_camera_settings_get_value(ai_camera_config_t config)
+{
+    return json_settings_get_int_or(camera_ctx.p_settings, config_names[config], default_config[config]);
+}
+
+static bool stop_camera_thread(TickType_t timeout_ticks)
+{
+    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
+    const EventBits_t bits = xEventGroupWaitBits(camera_ctx.camera_thread_commands,
+            (1 << CAMERA_CMD_RESP_STOP_DONE), pdTRUE, pdTRUE, timeout_ticks);
+    if (0 == (bits & (1 << CAMERA_CMD_RESP_STOP_DONE))) {
+        xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
+        return false;
+    }
+    return true;
+}
+
+static void resume_camera_thread(void)
+{
+    xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_START));
+}
+
+static void set_sensor_settings(void)
+{
+    sensor_t *p_sensor = esp_camera_sensor_get();
+    if (NULL == p_sensor) {
+        ESP_LOGE(TAG, "Failed to get sensor object");
+        return;
+    }
+
+    if (0 != p_sensor->set_contrast(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_CONTRAST))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_brightness(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_BRIGHTNESS))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_saturation(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_SATURATION))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_sharpness(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_SHARPNESS))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_denoise(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_DENOISE))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_gainceiling(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_GAINCEILING))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_quality(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_JPEG_QUALITY))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_colorbar(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_COLORBAR))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_whitebal(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_WHITEBAL))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_gain_ctrl(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_GAIN_CTRL))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_exposure_ctrl(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_EXPOSURE_CTRL))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_hmirror(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_HMIRROR))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_vflip(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_VFLIP))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_aec2(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AEC2))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_awb_gain(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AWB_GAIN))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_agc_gain(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AGC_GAIN))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_aec_value(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AEC_VALUE))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_special_effect(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_SPECIAL_EFFECT))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_wb_mode(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_WB_MODE))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_ae_level(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AE_LEVEL))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_dcw(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_DCW))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_bpc(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_BPC))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_wpc(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_WPC))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_raw_gma(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_RAW_GMA))) {
+        goto error;
+    }
+    if (0 != p_sensor->set_lenc(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_LENC))) {
+        goto error;
+    }
+    ESP_LOGI(TAG, "Sensor settings applied successfully");
+    return;
+ error:
+    ESP_LOGE(TAG, "Failed to configure sensor");
 }

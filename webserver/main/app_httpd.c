@@ -238,41 +238,12 @@ static esp_err_t http_handler_get_picture(httpd_req_t *req)
 static esp_err_t http_handler_get_settings(httpd_req_t *req)
 {
     http_settings_type_t settings_type = (http_settings_type_t)req->user_ctx;
-    cJSON *p_root = cJSON_CreateObject();
-    if (NULL == p_root) {
-        goto fail;
-    }
+    const cJSON *p_root = NULL;
 
     if (HTTP_SETTINGS_TYPE_CAMERA == settings_type) {
-        for (int i = 0; i < AI_CAMERA_CONFIG_MAX; i++) {
-            const char *p_name = ai_camera_config_get_name(i);
-            switch (ai_camera_config_get_type(i)) {
-            case CONFIG_TYPE_STRING:
-                cJSON_AddStringToObject(p_root, p_name, (const char *)ai_camera_config_get_value(i));
-                break;
-            case CONFIG_TYPE_INT:
-                cJSON_AddNumberToObject(p_root, p_name, (int)ai_camera_config_get_value(i));
-                break;
-            default:
-                assert(0);
-                break;
-            }
-        }
+        p_root = ai_camera_settings_get_json();
     } else if (HTTP_SETTINGS_TYPE_SYSTEM == settings_type) {
-        for (int i = 0; i < SYSTEM_CONFIG_MAX; i++) {
-            const char *p_name = system_config_get_name(i);
-            switch (system_config_get_type(i)) {
-            case CONFIG_TYPE_STRING:
-                cJSON_AddStringToObject(p_root, p_name, (const char *)system_config_get_value(i));
-                break;
-            case CONFIG_TYPE_INT:
-                cJSON_AddNumberToObject(p_root, p_name, (int)system_config_get_value(i));
-                break;
-            default:
-                assert(0);
-                break;
-            }
-        }
+        p_root = system_settings_get_json();
     }
 
     char *p_response = cJSON_Print(p_root);
@@ -283,10 +254,8 @@ static esp_err_t http_handler_get_settings(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     esp_err_t ret = httpd_resp_send(req, p_response, strlen(p_response));
     free(p_response);
-    cJSON_Delete(p_root);
     return ret;
 fail:
-    cJSON_Delete(p_root);
     httpd_resp_set_status(req, "500 Internal server error");
     httpd_resp_send(req, NULL, 0);
     return ESP_OK;
@@ -321,11 +290,11 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
     }
 
     if (HTTP_SETTINGS_TYPE_CAMERA == settings_type) {
-        ai_camera_process_settings_json(p_settings);
-        ai_camera_config_apply();
+        ai_camera_settings_set_json(p_settings);
+        ai_camera_settings_apply();
     } else if (HTTP_SETTINGS_TYPE_SYSTEM == settings_type) {
-        system_config_process_json(p_settings);
-        system_config_apply();
+        system_settings_set_json(p_settings);
+        system_settings_apply();
     }
 
     cJSON_Delete(p_settings);

@@ -17,10 +17,10 @@
 
 #include "bsp.h"
 #include "pir.h"
-#include "config.h"
 #include "ai_camera.h"
 #include "app_httpd.h"
 #include "network.h"
+#include "json_settings_helpers.h"
 
 #define TAG "main"
 
@@ -28,25 +28,14 @@
 #define APP_TASK_STACK_SIZE 4096
 #define APP_TASK_PRIORITY   5
 
-static config_desc_t system_config_desc[SYSTEM_CONFIG_MAX] = {
-    [SYSTEM_CONFIG_PIR_ENABLED] = { "pir_enabled", CONFIG_TYPE_INT },
-    [SYSTEM_CONFIG_WIFI_SSID] = { "wifi_ssid", CONFIG_TYPE_STRING },
-    [SYSTEM_CONFIG_WIFI_PASSWORD] = { "wifi_password", CONFIG_TYPE_STRING },
-};
-
-static config_value_t system_config_values[SYSTEM_CONFIG_MAX];
-static config_ctx_t system_config_ctx = {
-    .num_vars = SYSTEM_CONFIG_MAX,
-    .p_desc = system_config_desc,
-    .p_values = system_config_values,
-};
-
 static QueueHandle_t event_queue;
+static cJSON *p_system_settings;
 
 static void pir_motion_callback(void *ctx);
 static void wifi_connection_callback(void);
 static void button_callback(void);
 static void app_task(void *pvArg);
+static cJSON *system_settings_make_default(void);
 
 void app_main(void)
 {
@@ -55,42 +44,31 @@ void app_main(void)
     configASSERT(pdTRUE == xRet);
 }
 
-const char *system_config_get_name(system_config_t config)
+void system_settings_set_json(const cJSON *p_settings)
 {
-    return config_get_name(&system_config_ctx, (int)config);
+    if (!cJSON_Compare(p_system_settings, p_settings, false)) {
+        cJSON_Delete(p_system_settings);
+        p_system_settings = cJSON_Duplicate(p_settings, true);
+    }
 }
 
-const void *system_config_get_value(system_config_t config)
+const cJSON *system_settings_get_json(void)
 {
-    return config_get_value(&system_config_ctx, (int)config);
+    return p_system_settings;
 }
 
-void system_config_set_value(system_config_t config, const void *p_value)
-{
-    config_set_value(&system_config_ctx, (int)config, p_value);
-}
-
-system_config_t system_config_get_by_name(const char *name)
-{
-    return (int)config_get_by_name(&system_config_ctx, name);
-}
-
-config_type_t system_config_get_type(system_config_t config)
-{
-    return config_get_type(&system_config_ctx, (int)config);
-}
-
-void system_config_apply(void)
+void system_settings_apply(void)
 {
     char curr_ssid[33] = { 0 };
     char curr_password[64] = { 0 };
-    const char *new_ssid = system_config_get_value(SYSTEM_CONFIG_WIFI_SSID);
-    const char *new_password = system_config_get_value(SYSTEM_CONFIG_WIFI_PASSWORD);
+    const char *new_ssid = json_settings_get_string_or(p_system_settings, "wifi_ssid", "");
+    const char *new_password = json_settings_get_string_or(p_system_settings, "wifi_password", "");
     network_get_credentials(curr_ssid, curr_password);
     if (0 != strcmp(curr_ssid, new_ssid) || 0 != strcmp(curr_password, new_password)) {
         ESP_LOGI(TAG, "Updating WiFi settings from %s to %s", curr_ssid, new_ssid);
         app_send_event(APP_EVENT_NEW_WIFI_SETTINGS);
     }
+    json_settings_save_to_nvs("system", p_system_settings);
 }
 
 void app_send_event(app_event_t ev)
@@ -105,41 +83,6 @@ void app_send_event_from_isr(app_event_t ev)
     BaseType_t xRet = xQueueSendFromISR(event_queue, &ev, &wakeup_needed);
     configASSERT(pdTRUE == xRet);
     portYIELD_FROM_ISR(wakeup_needed);
-}
-
-void system_config_process_json(const cJSON *p_settings)
-{
-    cJSON *p_cfg_val = NULL;
-    cJSON_ArrayForEach(p_cfg_val, p_settings)
-    {
-        system_config_t config = system_config_get_by_name(p_cfg_val->string);
-        if (SYSTEM_CONFIG_MAX == config) {
-            ESP_LOGE(TAG, "Unknown config variable %s", p_cfg_val->string);
-            continue;
-        }
-        switch (system_config_get_type(config)) {
-        case CONFIG_TYPE_STRING:
-            if (!cJSON_IsString(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected string", p_cfg_val->string);
-                continue;
-            }
-            ESP_LOGI(TAG, "Set %d to %s", config, p_cfg_val->valuestring);
-            system_config_set_value(config, (const void *)p_cfg_val->valuestring);
-            break;
-        case CONFIG_TYPE_INT: {
-            if (!cJSON_IsNumber(p_cfg_val)) {
-                ESP_LOGE(TAG, "Wrong config variable type %s, expected number", p_cfg_val->string);
-                continue;
-            }
-            const int valueint = (int)p_cfg_val->valuedouble;
-            system_config_set_value(config, (const void *)valueint);
-            break;
-        }
-        default:
-            assert(0);
-            break;
-        }
-    }
 }
 
 static void pir_motion_callback(void *ctx)
@@ -157,19 +100,6 @@ static void wifi_connection_callback(void)
     app_send_event(APP_EVENT_WIFI_CONNECTED);
 }
 
-static bool load_wifi_creds(void)
-{
-    char wifi_ssid[33] = { 0 };
-    char wifi_password[64] = { 0 } ;
-
-    network_get_credentials(wifi_ssid, wifi_password);
-
-    system_config_set_value(SYSTEM_CONFIG_WIFI_SSID, wifi_ssid);
-    system_config_set_value(SYSTEM_CONFIG_WIFI_PASSWORD, wifi_password);
-
-    return wifi_ssid[0] != 0;
-}
-
 static void app_task(void *pvArg)
 {
     bool ap_mode = false;
@@ -181,22 +111,31 @@ static void app_task(void *pvArg)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+    json_settings_helpers_init();
+    p_system_settings = json_settings_load_from_nvs("system");
+    if (NULL == p_system_settings) {
+        p_system_settings = system_settings_make_default();
+        json_settings_save_to_nvs("system", p_system_settings);
+    }
 
     event_queue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(app_event_t));
 
     network_init("ai-camera", wifi_connection_callback);
 
-    if (load_wifi_creds()) {
-        const char *p_ssid = system_config_get_value(SYSTEM_CONFIG_WIFI_SSID);
-        const char *p_password = system_config_get_value(SYSTEM_CONFIG_WIFI_PASSWORD);
-        ESP_LOGI(TAG, "Starting in STA mode, connecting to %s", p_ssid);
-        network_sta_mode(p_ssid, p_password);
-        ap_mode = false;
-    } else {
-        ESP_LOGI(TAG, "No STA config saved, starting in AP mode");
-        network_ap_mode();
-        app_httpd_start(true);
-        ap_mode = true;
+    {
+        const char *p_ssid = json_settings_get_string_or(p_system_settings, "wifi_ssid", "");
+        const char *p_password = json_settings_get_string_or(p_system_settings, "wifi_password", "");
+
+        if (p_ssid[0] != 0) {
+            ESP_LOGI(TAG, "Starting in STA mode, connecting to %s", p_ssid);
+            network_sta_mode(p_ssid, p_password);
+            ap_mode = false;
+        } else {
+            ESP_LOGI(TAG, "No STA config saved, starting in AP mode");
+            network_ap_mode();
+            app_httpd_start(true);
+            ap_mode = true;
+        }
     }
 
     bsp_init(button_callback);
@@ -218,8 +157,8 @@ static void app_task(void *pvArg)
             break;
         case APP_EVENT_BUTTON_PRESSED:
             if (ap_mode) {
-                const char *p_ssid = system_config_get_value(SYSTEM_CONFIG_WIFI_SSID);
-                const char *p_password = system_config_get_value(SYSTEM_CONFIG_WIFI_PASSWORD);
+                const char *p_ssid = json_settings_get_string_or(p_system_settings, "wifi_ssid", "");
+                const char *p_password = json_settings_get_string_or(p_system_settings, "wifi_password", "");
                 if (p_ssid != NULL && p_ssid[0] != 0) {
                     ESP_LOGI(TAG, "Switching to STA mode");
                     app_httpd_stop();
@@ -239,10 +178,17 @@ static void app_task(void *pvArg)
         case APP_EVENT_NEW_WIFI_SETTINGS:
             ESP_LOGI(TAG, "Reconnecting to the new AP");
             app_httpd_stop();
-            network_sta_mode(system_config_get_value(SYSTEM_CONFIG_WIFI_SSID), system_config_get_value(SYSTEM_CONFIG_WIFI_PASSWORD));
+            network_sta_mode(json_settings_get_string_or(p_system_settings, "wifi_ssid", ""),
+                    json_settings_get_string_or(p_system_settings, "wifi_password", ""));
             ap_mode = false;
         default:
             break;
         }
     }
+}
+
+static cJSON *system_settings_make_default(void)
+{
+    const char *p_default_json = "{\"wifi_ssid\":\"\",\"wifi_password\":\"\"}";
+    return cJSON_ParseWithLength(p_default_json, strlen(p_default_json));
 }

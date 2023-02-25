@@ -9,6 +9,10 @@
 
 #include "config.h"
 
+#define AI_CAMERA_IR_THRESH_LOW_DEFAULT  10
+#define AI_CAMERA_IR_THRESH_HIGH_DEFAULT 40
+#define AI_CAMERA_IR_BRIGHTNESS_DEFAULT  255
+
 typedef enum {
     AI_CAMERA_IR_MODE_AUTO,
     AI_CAMERA_IR_MODE_DAY,
@@ -92,13 +96,6 @@ void ai_camera_get_stats(ai_camera_stats_t *p_stats_out);
 ai_camera_ir_state_t ai_camera_get_ir_state(void);
 float ai_camera_get_light_level(void);
 
-const char *ai_camera_config_get_name(ai_camera_config_t config);
-const void *ai_camera_config_get_value(ai_camera_config_t config);
-int ai_camera_config_get_value_int(ai_camera_config_t config);
-void ai_camera_config_set_value(ai_camera_config_t config, const void *p_value);
-void ai_camera_config_set_value_int(ai_camera_config_t config, int value);
-ai_camera_config_t ai_camera_config_get_by_name(const char *name);
-config_type_t ai_camera_config_get_type(ai_camera_config_t config);
-void ai_camera_config_apply(void);
-
-void ai_camera_process_settings_json(const cJSON *p_settings);
+void ai_camera_settings_set_json(const cJSON *p_settings);
+const cJSON *ai_camera_settings_get_json(void);
+void ai_camera_settings_apply(void);

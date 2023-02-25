@@ -19,12 +19,8 @@ typedef enum {
     APP_EVENT_MAX,
 } app_event_t;
 
-const char *system_config_get_name(system_config_t config);
-const void *system_config_get_value(system_config_t config);
-void system_config_set_value(system_config_t config, const void *p_value);
-system_config_t system_config_get_by_name(const char *name);
-config_type_t system_config_get_type(system_config_t config);
-void system_config_apply(void);
-void system_config_process_json(const cJSON *p_settings);
+void system_settings_set_json(const cJSON *p_settings);
+const cJSON *system_settings_get_json(void);
+void system_settings_apply(void);
 
 void app_send_event(app_event_t ev);
