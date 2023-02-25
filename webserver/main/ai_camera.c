@@ -552,83 +552,112 @@ static void set_sensor_settings(void)
         return;
     }
 
+    ai_camera_config_t cfg = AI_CAMERA_CONFIG_CONTRAST;
+
     if (0 != p_sensor->set_contrast(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_CONTRAST))) {
+        cfg = AI_CAMERA_CONFIG_CONTRAST;
         goto error;
     }
     if (0 != p_sensor->set_brightness(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_BRIGHTNESS))) {
+        cfg = AI_CAMERA_CONFIG_BRIGHTNESS;
         goto error;
     }
     if (0 != p_sensor->set_saturation(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_SATURATION))) {
+        cfg = AI_CAMERA_CONFIG_SATURATION;
         goto error;
     }
+    /*
     if (0 != p_sensor->set_sharpness(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_SHARPNESS))) {
+        cfg = AI_CAMERA_CONFIG_SHARPNESS;
         goto error;
     }
     if (0 != p_sensor->set_denoise(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_DENOISE))) {
+        cfg = AI_CAMERA_CONFIG_DENOISE;
         goto error;
     }
+    */
     if (0 != p_sensor->set_gainceiling(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_GAINCEILING))) {
+        cfg = AI_CAMERA_CONFIG_GAINCEILING;
         goto error;
     }
     if (0 != p_sensor->set_quality(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_JPEG_QUALITY))) {
+        cfg = AI_CAMERA_CONFIG_JPEG_QUALITY;
         goto error;
     }
     if (0 != p_sensor->set_colorbar(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_COLORBAR))) {
+        cfg = AI_CAMERA_CONFIG_COLORBAR;
         goto error;
     }
     if (0 != p_sensor->set_whitebal(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_WHITEBAL))) {
+        cfg = AI_CAMERA_CONFIG_WHITEBAL;
         goto error;
     }
     if (0 != p_sensor->set_gain_ctrl(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_GAIN_CTRL))) {
+        cfg = AI_CAMERA_CONFIG_GAIN_CTRL;
         goto error;
     }
     if (0 != p_sensor->set_exposure_ctrl(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_EXPOSURE_CTRL))) {
+        cfg = AI_CAMERA_CONFIG_EXPOSURE_CTRL;
         goto error;
     }
     if (0 != p_sensor->set_hmirror(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_HMIRROR))) {
+        cfg = AI_CAMERA_CONFIG_HMIRROR;
         goto error;
     }
     if (0 != p_sensor->set_vflip(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_VFLIP))) {
+        cfg = AI_CAMERA_CONFIG_VFLIP;
         goto error;
     }
     if (0 != p_sensor->set_aec2(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AEC2))) {
+        cfg = AI_CAMERA_CONFIG_AEC2;
         goto error;
     }
     if (0 != p_sensor->set_awb_gain(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AWB_GAIN))) {
+        cfg = AI_CAMERA_CONFIG_AWB_GAIN;
         goto error;
     }
     if (0 != p_sensor->set_agc_gain(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AGC_GAIN))) {
+        cfg = AI_CAMERA_CONFIG_AGC_GAIN;
         goto error;
     }
     if (0 != p_sensor->set_aec_value(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AEC_VALUE))) {
+        cfg = AI_CAMERA_CONFIG_AEC_VALUE;
         goto error;
     }
     if (0 != p_sensor->set_special_effect(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_SPECIAL_EFFECT))) {
+        cfg = AI_CAMERA_CONFIG_SPECIAL_EFFECT;
         goto error;
     }
     if (0 != p_sensor->set_wb_mode(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_WB_MODE))) {
+        cfg = AI_CAMERA_CONFIG_WB_MODE;
         goto error;
     }
     if (0 != p_sensor->set_ae_level(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_AE_LEVEL))) {
+        cfg = AI_CAMERA_CONFIG_AE_LEVEL;
         goto error;
     }
     if (0 != p_sensor->set_dcw(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_DCW))) {
+        cfg = AI_CAMERA_CONFIG_DCW;
         goto error;
     }
     if (0 != p_sensor->set_bpc(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_BPC))) {
+        cfg = AI_CAMERA_CONFIG_BPC;
         goto error;
     }
     if (0 != p_sensor->set_wpc(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_WPC))) {
+        cfg = AI_CAMERA_CONFIG_WPC;
         goto error;
     }
     if (0 != p_sensor->set_raw_gma(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_RAW_GMA))) {
+        cfg = AI_CAMERA_CONFIG_RAW_GMA;
         goto error;
     }
     if (0 != p_sensor->set_lenc(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_LENC))) {
+        cfg = AI_CAMERA_CONFIG_LENC;
         goto error;
     }
     ESP_LOGI(TAG, "Sensor settings applied successfully");
     return;
  error:
-    ESP_LOGE(TAG, "Failed to configure sensor");
+    ESP_LOGE(TAG, "Failed to configure sensor %d", cfg);
 }

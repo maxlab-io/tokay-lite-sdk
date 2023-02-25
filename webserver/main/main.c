@@ -39,6 +39,21 @@ static cJSON *system_settings_make_default(void);
 
 void app_main(void)
 {
+    gpio_install_isr_service(0);
+    bsp_init(button_callback);
+    pir_init(pir_motion_callback, NULL);
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+    json_settings_helpers_init();
+    p_system_settings = json_settings_load_from_nvs("system");
+    if (NULL == p_system_settings) {
+        p_system_settings = system_settings_make_default();
+        json_settings_save_to_nvs("system", p_system_settings);
+    }
     BaseType_t xRet = xTaskCreatePinnedToCore(app_task, "APP_TSK", APP_TASK_STACK_SIZE,
             NULL, APP_TASK_PRIORITY, NULL, 0);
     configASSERT(pdTRUE == xRet);
@@ -104,20 +119,6 @@ static void app_task(void *pvArg)
 {
     bool ap_mode = false;
 
-    gpio_install_isr_service(0);
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-    json_settings_helpers_init();
-    p_system_settings = json_settings_load_from_nvs("system");
-    if (NULL == p_system_settings) {
-        p_system_settings = system_settings_make_default();
-        json_settings_save_to_nvs("system", p_system_settings);
-    }
-
     event_queue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(app_event_t));
 
     network_init("ai-camera", wifi_connection_callback);
@@ -137,9 +138,6 @@ static void app_task(void *pvArg)
             ap_mode = true;
         }
     }
-
-    bsp_init(button_callback);
-    pir_init(pir_motion_callback, NULL);
 
     ai_camera_init(BSP_I2C_BUS_ID);
 

@@ -13,7 +13,7 @@ static SemaphoreHandle_t nvs_mutex;
 
 void json_settings_helpers_init(void)
 {
-    nvs_mutex = xSemaphoreCreateBinary();
+    nvs_mutex = xSemaphoreCreateMutex();
 }
 
 cJSON *json_settings_load_from_nvs(const char *p_category)
