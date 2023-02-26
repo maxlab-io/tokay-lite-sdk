@@ -25,6 +25,8 @@
 
 #define TELEMETRY_UPDATE_PERIOD_MS 1000
 
+#define CONTROL_WS_MAX_FRAME_LEN 512
+
 #define TAG "app_httpd"
 
 typedef enum {
@@ -44,7 +46,7 @@ static esp_err_t http_handler_get_static_page(httpd_req_t *req);
 static esp_err_t http_handler_get_picture(httpd_req_t *req);
 static esp_err_t http_handler_get_settings(httpd_req_t *req);
 static esp_err_t http_handler_set_settings(httpd_req_t *req);
-static esp_err_t http_handler_ws_telemetry(httpd_req_t *req);
+static esp_err_t http_handler_ws_control(httpd_req_t *req);
 
 static esp_err_t http_handler_get_stream(httpd_req_t *req);
 static void camera_metadata_cb(cJSON *p_meta_root, void *p_ctx);
@@ -120,10 +122,10 @@ static const httpd_uri_t handler_set_system_settings = {
     .user_ctx  = (void *)HTTP_SETTINGS_TYPE_SYSTEM,
 };
 
-static const httpd_uri_t handler_ws_telemetry = {
-    .uri       = "/telemetry",
+static const httpd_uri_t handler_ws_control = {
+    .uri       = "/control",
     .method    = HTTP_GET,
-    .handler   = http_handler_ws_telemetry,
+    .handler   = http_handler_ws_control,
     .user_ctx  = NULL,
     .is_websocket = true,
 };
@@ -169,7 +171,7 @@ void app_httpd_start(bool wifi_setup)
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_system_settings));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_camera_settings));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_system_settings));
-        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_ws_telemetry));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_ws_control));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_stream));
     }
 
@@ -303,12 +305,57 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
     return httpd_resp_send(req, NULL, 0);
 }
 
-static esp_err_t http_handler_ws_telemetry(httpd_req_t *req)
+static esp_err_t http_handler_ws_control(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
         ESP_LOGI(TAG, "Handshake done, a new WS connection was opened");
         send_telemetry((void *)httpd_req_to_sockfd(req));
     }
+
+    httpd_ws_frame_t ws_pkt;
+    uint8_t *buf = NULL;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    /* Set max_len = 0 to get the frame len */
+    esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_ws_recv_frame failed to get frame len with %d", ret);
+        return ret;
+    }
+    ESP_LOGI(TAG, "frame len is %d", ws_pkt.len);
+    if (ws_pkt.len && ws_pkt.len < CONTROL_WS_MAX_FRAME_LEN) {
+        /* ws_pkt.len + 1 is for NULL termination as we are expecting a string */
+        buf = calloc(1, ws_pkt.len + 1);
+        if (buf == NULL) {
+            ESP_LOGE(TAG, "Failed to calloc memory for buf");
+            return ESP_ERR_NO_MEM;
+        }
+        ws_pkt.payload = buf;
+        /* Set max_len = ws_pkt.len to get the frame payload */
+        ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
+            free(buf);
+            return ret;
+        }
+        ESP_LOGI(TAG, "Got packet with message: %s", ws_pkt.payload);
+    }
+    ESP_LOGI(TAG, "Packet type: %d", ws_pkt.type);
+    if (ws_pkt.type == HTTPD_WS_TYPE_TEXT) {
+        cJSON *p_root = cJSON_ParseWithLength((const char *)ws_pkt.payload, ws_pkt.len);
+        if (NULL == p_root) {
+            ESP_LOGE(TAG, "Failed to parse JSON");
+            free(buf);
+            return ESP_FAIL;
+        }
+        cJSON *p_camera_imm_config = cJSON_GetObjectItem(p_root, "cameraSettings");
+        cJSON *p_cfg = NULL;
+        cJSON_ArrayForEach(p_cfg, p_camera_imm_config) {
+            ai_camera_settings_apply_single_var(p_cfg);
+        }
+        cJSON_Delete(p_root);
+    }
+    free(buf);
 
     return ESP_OK;
 }

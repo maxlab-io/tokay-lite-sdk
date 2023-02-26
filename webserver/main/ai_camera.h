@@ -99,3 +99,4 @@ float ai_camera_get_light_level(void);
 void ai_camera_settings_set_json(const cJSON *p_settings);
 const cJSON *ai_camera_settings_get_json(void);
 void ai_camera_settings_apply(void);
+void ai_camera_settings_apply_single_var(const cJSON *p_var);

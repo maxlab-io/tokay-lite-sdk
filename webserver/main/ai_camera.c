@@ -341,6 +341,21 @@ void ai_camera_settings_apply(void)
     resume_camera_thread();
 }
 
+void ai_camera_settings_apply_single_var(const cJSON *p_var)
+{
+    cJSON *p_cfg = cJSON_GetObjectItem(camera_ctx.p_settings, p_var->string);
+    if (NULL != p_cfg) {
+        if (0 == strcmp(config_names[AI_CAMERA_CONFIG_RESOLUTION], p_var->string) ||
+                0 == strcmp(config_names[AI_CAMERA_CONFIG_XCLK_FREQ], p_var->string)) {
+            camera_ctx.settings_require_restart = true;
+        }
+        if (p_cfg->valueint != p_var->valueint) {
+            p_cfg->valueint = p_var->valueint;
+            ai_camera_settings_apply();
+        }
+    }
+}
+
 static void ir_cut_on(void)
 {
     gpio_set_level(IRCUT_CTRL_PIN, 0);
