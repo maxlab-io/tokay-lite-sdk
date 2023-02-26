@@ -39,10 +39,10 @@
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/3.36.3/apexcharts.min.css"
     integrity="sha512-tJYqW5NWrT0JEkWYxrI4IK2jvT7PAiOwElIGTjALSyr8ZrilUQf+gjw2z6woWGSZqeXASyBXUr+WbtqiQgxUYg=="
-    crossorigin="anonymous" referrerpolicy="no-referrer" />
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonform/2.2.5/jsonform.js"
-    integrity="sha512-7+/iHAMg7Yn0B7v6kbWoZYGstHvUeehAe0Rd77bndsvA0jk5z7fQt0qagSyvCRrr6pCBVDUUZlIXlcVhSv2l6g=="
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.perfect-scrollbar/1.5.5/perfect-scrollbar.min.js"
+    integrity="sha512-X41/A5OSxoi5uqtS6Krhqz8QyyD8E/ZbN7B4IaBSgqPLRbWVuXJXr9UwOujstj71SoVxh5vxgy7kmtd17xrJRw=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
   <!-- Page CSS -->
@@ -380,9 +380,11 @@
 
                       <!-- image sensor tab -->
                       <div class="tab-pane fade" id="tab-image-sensor" role="tabpanel">
-                        <div class="card">
+                        <div class="card overflow-hidden" id="cameraSettingsCard">
                           <h5 class="card-header">Camera config</h5>
                           <div class="card-body">
+                            <form id="cameraSettingsForm">
+                            </form>
                           </div>
                         </div>
                       </div>
@@ -749,16 +751,294 @@
       }
     }
 
+    function generateCameraSettingsForm() {
+        const schema = {
+            resolution: {
+                type: 'list',
+                title: 'Resolution',
+                required: true,
+                vals: [
+                    "160", "320", "640", "800", "1600"
+                ],
+                default: "320"
+            },
+            contrast: {
+                type: 'range',
+                title: 'Contrast',
+                required: true,
+                minimum: -2,
+                maximum: 2,
+                default: 0
+            },
+            brightness: {
+                type: 'range',
+                title: 'Brigtness',
+                required: true,
+                minimum: -2,
+                maximum: 2,
+                default: 0
+            },
+            saturation: {
+                type: 'range',
+                title: 'Saturation',
+                required: true,
+                minimum: -2,
+                maximum: 2,
+                default: 0
+            },
+            sharpness: {
+                type: 'range',
+                title: 'Sharpness',
+                required: true,
+                minimum: -2,
+                maximum: 2,
+                default: 0
+            },
+            denoise: {
+                type: 'checkbox',
+                title: 'Denoise',
+                required: true,
+                default: true
+            },
+            gainceiling: {
+                type: 'range',
+                title: 'Gainceiling',
+                required: true,
+                minimum: 0,
+                maximum: 6,
+                default: 0
+            },
+            jpeg_quality: {
+                type: 'range',
+                title: 'JPEG quality',
+                required: true,
+                minimum: 1,
+                maximum: 64,
+                default: 20
+            },
+            colorbar: {
+                type: 'checkbox',
+                title: 'Colorbar',
+                required: true,
+                default: false
+            },
+            whitebal: {
+                type: 'checkbox',
+                title: 'AWB',
+                required: true,
+                default: true
+            },
+            gain_ctrl: {
+                type: 'checkbox',
+                title: 'AGC',
+                required: true,
+                default: true
+            },
+            exposure_ctrl: {
+                type: 'checkbox',
+                title: 'AEC',
+                required: true,
+                default: true
+            },
+            hmirror: {
+                type: 'checkbox',
+                title: 'horizontal mirroring',
+                required: true,
+                default: false
+            },
+            vflip: {
+                type: 'checkbox',
+                title: 'vertical flip',
+                required: true,
+                default: false
+            },
+            aec2: {
+                type: 'checkbox',
+                title: 'AEC2',
+                required: true,
+                default: false
+            },
+            awb_gain: {
+                type: 'range',
+                title: 'AWB Gain',
+                required: true,
+                minimum: 0,
+                maximum: 255,
+                default: 0
+            },
+            agc_gain: {
+                type: 'range',
+                title: 'AGC Gain',
+                required: true,
+                minimum: 0,
+                maximum: 255,
+                default: 0
+            },
+            aec: {
+                type: 'range',
+                title: 'AEC value',
+                required: true,
+                minimum: 0,
+                maximum: 1200,
+                default: 600
+            },
+            special_effect: {
+                type: 'list',
+                title: 'Special effect',
+                required: true,
+                vals: [
+                    "None", "Negative", "BlackAndWhite", "Reddish", "Greenish", "Blue", "Retro"
+                ],
+                default: 0
+            },
+            wb_mode: {
+                type: 'list',
+                title: 'White Balance mode',
+                required: true,
+                vals: [
+                    "Sunny", "Cloudy", "Office", "Home"
+                ],
+                default: 0
+            },
+            ae_level: {
+                type: 'range',
+                title: 'AE level',
+                required: true,
+                minimum: -2,
+                maximum: 2,
+                default: 0
+            },
+            dcw: {
+                type: 'checkbox',
+                title: 'DCW',
+                required: true,
+                default: true
+            },
+            bpc: {
+                type: 'checkbox',
+                title: 'BPC',
+                required: true,
+                default: true
+            },
+            wpc: {
+                type: 'checkbox',
+                title: 'WPC',
+                required: true,
+                default: true
+            },
+            raw_gma: {
+                type: 'checkbox',
+                title: 'Raw GMA',
+                required: true,
+                default: true
+            },
+            lenc: {
+                type: 'checkbox',
+                title: 'Lenc',
+                required: true,
+                default: true
+            },
+            xclk_freq: {
+                type: 'list',
+                title: 'XCLK frequency',
+                required: true,
+                vals: [ "1M", "2M", "4M", "8M", "16M", "10M", "20M" ],
+                default: 4
+            },
+            ir_mode: {
+                type: 'list',
+                title: 'IR mode',
+                vals: [ "auto", "day", "night" ],
+                default: 0
+            },
+            ir_light_thresh_high: {
+                type: 'range',
+                title: 'IR light thresh high',
+                minimum: 0,
+                maximum: 16000,
+                default: 120
+            },
+            ir_light_thresh_low: {
+                type: 'range',
+                title: 'IR light thresh low',
+                minimum: 0,
+                maximum: 16000,
+                default: 100
+            },
+            ir_brightness: {
+                type: 'range',
+                title: 'IR LEDs brightness',
+                minimum: 0,
+                maximum: 255,
+                default: 255
+            },
+        }
+
+        var cameraForm = $('#cameraSettingsForm');
+
+        for (const input_name in schema) {
+            const input = schema[input_name];
+            console.log(input);
+            if (input.type == 'list') {
+                const list_input =
+                      `<div class="input-group my-3">
+                         <label for="${input_name}" class="col-md-4 form-label">${input.title}</label>
+                         <select id="${input_name}" class="col-md-8 form-select">
+                         </select>
+                       </div>`;
+                cameraForm.append(list_input);
+                var i = 0;
+                var elem = $(`#${input_name}`)
+                for (const val in input.vals) {
+                    if (input.default == i) {
+                        elem.append(`<option selected="selected" value="${i}">${input.vals[val]}</option>`);
+                    } else {
+                        elem.append(`<option value="${i}">${input.vals[val]}</option>`);
+                    }
+                    i += 1;
+                }
+            } else if (input.type == 'checkbox') {
+                const checkbox_input =
+                    `<div class="input-group my-3">
+                        <label for="${input_name}" class="col-md-4 form-label">${input.title}</label>
+                        <input class="form-check-input col-md-8" type="checkbox" id="${input_name}"/>
+                    </div>`;
+                cameraForm.append(checkbox_input);
+                if (input.default == true) {
+                    $(`#${input_name}`).prop("checked", true);
+                }
+            } else if (input.type == 'range') {
+                const range_input =
+                    `<div class="input-group my-3">
+                        <div class="col-md-4">
+                          <label for="${input_name}" class="form-label">${input.title}</label>
+                        </div>
+                        <div class="col-md-6">
+                          <input class="form-range" type="range" id="${input_name}"
+                                 min="${input.minimum}" max="${input.maximum}" value="${input.default}" step="1"/>
+                        </div>
+                        <div class="col-md-2">
+                          <output class="form-range" type="range" id="${input_name}"
+                                 min="${input.minimum}" max="${input.maximum}" value="${input.default}" step="1"/>
+                        </div>
+                    </div>`;
+                cameraForm.append(range_input);
+            }
+        }
+    }
+
     window.addEventListener('load', () => {
       openTelemetrySocket();
       fetchSettings('system', 'wifiForm');
       defaultCanvas();
+      generateCameraSettingsForm();
+      $('#cameraSettingsCard').attr('style', 'height:710px;');
+      const ps = new PerfectScrollbar('#cameraSettingsCard');
     });
 
     $(document).on('click', '.nav-link.active', function() {
         $('.active').removeClass('active');
         const tab_id = $(this).attr("data-bs-target")
-        console.log(tab_id)
         $(this).addClass('active')
         $(tab_id).addClass('active')
     });
