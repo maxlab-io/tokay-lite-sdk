@@ -1097,7 +1097,7 @@
         };
         generateSettingsForm(cameraSettingsSchema, 'cameraSettingsForm', g_control_socket,
                              'cameraSettings', cameraSettingsOnSubmit);
-        $('#cameraSettingsCard').attr('style', 'height:710px;');
+        $('#cameraSettingsCard').attr('style', 'max-height:710px;');
         const ps = new PerfectScrollbar('#cameraSettingsCard');
     });
 
