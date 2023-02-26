@@ -185,7 +185,7 @@
         <div class="content-wrapper">
 
           <!-- Content -->
-          <div class="container-fluid flex-grow-1 py-4 ps-1 pe-4">
+          <div class="container-fluid flex-grow-1 pt-4 ps-1 pe-4">
 
             <!-- Toast with Placements -->
             <div class="bs-toast toast toast-placement-ex m-2 fade bg-success top-0 start-50 translate-middle-x"
@@ -356,8 +356,8 @@
                             <form id="wifiForm">
                               <div class="form-group">
                                 <div class="row-md">
-                                  <input type="text" class="form-control mb-2" id="wifi_ssid" name="wifi_ssid" placeholder="SSID" />
-                                  <input type="password" class="form-control mb-2" name="wifi_password" id="wifi_password"
+                                  <input type="text" class="form-control mb-2" id="wifi_ssidVal" name="wifi_ssid" placeholder="SSID" />
+                                  <input type="password" class="form-control mb-2" name="wifi_password" id="wifi_passwordVal"
                                          placeholder="Password" />
                                 </div>
                                 <div class="row-md">
@@ -922,7 +922,7 @@
       xhr.onload = () => {
         resp_json = JSON.parse(xhr.responseText);
         for (let k in resp_json) {
-          let elem = $(`#${k}`);
+          let elem = $(`#${k}Val`);
           if (elem) {
             if (elem.attr('type') === 'password') {
               /* Or what? */
@@ -1017,7 +1017,7 @@
             if (input.type == 'list') {
                 const list_input =
                       `<div class="input-group my-3">
-                         <label for="${input_name}" class="col-md-4 form-label">${input.title}</label>
+                         <label for="${input_name}" class="col-md-4 pe-2 form-label">${input.title}</label>
                          <select id="${input_name}Val" name="${input_name}" class="col-md-8 form-select">
                          </select>
                        </div>`;
@@ -1036,7 +1036,7 @@
             } else if (input.type == 'checkbox') {
                 const checkbox_input =
                     `<div class="input-group my-3">
-                        <label for="${input_name}" class="col-md-4 form-label">${input.title}</label>
+                        <label for="${input_name}" class="col-md-4 pe-2 form-label">${input.title}</label>
                         <input class="form-check-input col-md-8" name="${input_name}" type="checkbox" id="${input_name}Val"/>
                     </div>`;
                 formObject.append(checkbox_input);
@@ -1047,7 +1047,7 @@
             } else if (input.type == 'range') {
                 const range_input =
                     `<div class="input-group my-3">
-                        <div class="col-sm-4">
+                        <div class="col-sm-4 pe-2">
                           <label for="${input_name}" class="form-label">${input.title}</label>
                         </div>
                         <div class="col-sm-5 me-3">
@@ -1099,6 +1099,7 @@
                              'cameraSettings', cameraSettingsOnSubmit);
         $('#cameraSettingsCard').attr('style', 'max-height:710px;');
         const ps = new PerfectScrollbar('#cameraSettingsCard');
+        fetchSettings('camera', 'cameraSettingsForm');
     });
 
     $(document).on('click', '.nav-link.active', function() {
