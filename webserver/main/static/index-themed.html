@@ -933,7 +933,6 @@
         xhr.setRequestHeader("Content-Type", "application/json");
         xhr.onload = () => {
             resp_json = JSON.parse(xhr.responseText);
-            console.log(resp_json)
             for (const k in schema) {
                 if (k in resp_json) {
                     if (schema[k].type == 'checkbox') {
