@@ -87,7 +87,7 @@ static const char *config_names[AI_CAMERA_CONFIG_MAX] = {
 };
 
 static int default_config[AI_CAMERA_CONFIG_MAX] = {
-    [AI_CAMERA_CONFIG_RESOLUTION] = FRAMESIZE_UXGA,
+    [AI_CAMERA_CONFIG_RESOLUTION] = 6,
     [AI_CAMERA_CONFIG_CONTRAST] = 0,
     [AI_CAMERA_CONFIG_BRIGHTNESS] = 0,
     [AI_CAMERA_CONFIG_SATURATION] = 0,
@@ -113,12 +113,16 @@ static int default_config[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_WPC] = 1,
     [AI_CAMERA_CONFIG_RAW_GMA] = 0,
     [AI_CAMERA_CONFIG_LENC] = 1,
-    [AI_CAMERA_CONFIG_XCLK_FREQ] = XCLK_DEFAULT_FREQ_HZ,
+    [AI_CAMERA_CONFIG_XCLK_FREQ] = 5,
     [AI_CAMERA_CONFIG_IR_MODE] = AI_CAMERA_IR_MODE_AUTO,
     [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = AI_CAMERA_IR_THRESH_HIGH_DEFAULT,
     [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = AI_CAMERA_IR_THRESH_LOW_DEFAULT,
     [AI_CAMERA_CONFIG_IR_BRIGHTNESS] = AI_CAMERA_IR_BRIGHTNESS_DEFAULT,
 };
+
+static int xclk_freq_map[] = { 1e6, 2e6, 4e6, 8e6, 10e6, 15e6, 20e6, 24e6 };
+static int resolution_map[] = { FRAMESIZE_96X96, FRAMESIZE_QQVGA, FRAMESIZE_QCIF,
+    FRAMESIZE_QVGA, FRAMESIZE_VGA, FRAMESIZE_SVGA, FRAMESIZE_768X768, FRAMESIZE_HD, FRAMESIZE_UXGA};
 
 static camera_config_t camera_config = {
     .pin_pwdn = CAM_PIN_PWDN,
@@ -331,8 +335,8 @@ void ai_camera_settings_apply(void)
             ESP_LOGE(TAG, "Failed to stop camera thread");
             return;
         }
-        camera_config.frame_size = ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION);
-        camera_config.xclk_freq_hz = ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ);
+        camera_config.frame_size = resolution_map[ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION)];
+        camera_config.xclk_freq_hz = xclk_freq_map[ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ)];
         esp_camera_deinit();
         esp_camera_init(&camera_config);
     }
@@ -344,12 +348,14 @@ void ai_camera_settings_apply(void)
 void ai_camera_settings_apply_single_var(const cJSON *p_var)
 {
     cJSON *p_cfg = cJSON_GetObjectItem(camera_ctx.p_settings, p_var->string);
+    ESP_LOGI(TAG, "");
     if (NULL != p_cfg) {
         if (0 == strcmp(config_names[AI_CAMERA_CONFIG_RESOLUTION], p_var->string) ||
                 0 == strcmp(config_names[AI_CAMERA_CONFIG_XCLK_FREQ], p_var->string)) {
             camera_ctx.settings_require_restart = true;
         }
         if (p_cfg->valueint != p_var->valueint) {
+            ESP_LOGI(TAG, "Changing %s from %d to %d", p_cfg->string, p_cfg->valueint, p_var->valueint);
             p_cfg->valueint = p_var->valueint;
             ai_camera_settings_apply();
         }
@@ -539,7 +545,9 @@ static cJSON *ai_camera_settings_get_default(void)
 
 static int ai_camera_settings_get_value(ai_camera_config_t config)
 {
-    return json_settings_get_int_or(camera_ctx.p_settings, config_names[config], default_config[config]);
+    const int ret = json_settings_get_int_or(camera_ctx.p_settings, config_names[config], default_config[config]);
+    ESP_LOGI(TAG, "%s=%d", config_names[config], ret);
+    return ret;
 }
 
 static bool stop_camera_thread(TickType_t timeout_ticks)
@@ -595,7 +603,8 @@ static void set_sensor_settings(void)
         cfg = AI_CAMERA_CONFIG_GAINCEILING;
         goto error;
     }
-    if (0 != p_sensor->set_quality(p_sensor, ai_camera_settings_get_value(AI_CAMERA_CONFIG_JPEG_QUALITY))) {
+    camera_config.jpeg_quality = ai_camera_settings_get_value(AI_CAMERA_CONFIG_JPEG_QUALITY);
+    if (0 != p_sensor->set_quality(p_sensor, camera_config.jpeg_quality)) {
         cfg = AI_CAMERA_CONFIG_JPEG_QUALITY;
         goto error;
     }

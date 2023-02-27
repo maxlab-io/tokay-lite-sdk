@@ -602,9 +602,10 @@
             title: 'Resolution',
             required: true,
             vals: [
-                "160", "320", "640", "800", "1600"
+                "96x96", "160x120", "176x144", "320x240", "640x480",
+                "800x600", "768x768", "1280x720", "1600x1200"
             ],
-            default: "320"
+            default: 6
         },
         contrast: {
             type: 'range',
@@ -674,27 +675,27 @@
         },
         gain_ctrl: {
             type: 'checkbox',
-            title: 'AGC',
+            title: 'Auto-gain correction',
             required: true,
             default: true
         },
         exposure_ctrl: {
             type: 'checkbox',
-            title: 'AEC',
+            title: 'Auto-exposure',
             required: true,
             default: true
         },
         hmirror: {
             type: 'checkbox',
-            title: 'horizontal mirroring',
+            title: 'Horizontal mirroring',
             required: true,
             default: false
         },
         vflip: {
             type: 'checkbox',
-            title: 'vertical flip',
+            title: 'Vertical flip',
             required: true,
-            default: false
+            default: true
         },
         aec2: {
             type: 'checkbox',
@@ -703,12 +704,10 @@
             default: false
         },
         awb_gain: {
-            type: 'range',
+            type: 'checkbox',
             title: 'AWB Gain',
             required: true,
-            minimum: 0,
-            maximum: 255,
-            default: 0
+            default: true
         },
         agc_gain: {
             type: 'range',
@@ -786,8 +785,8 @@
             type: 'list',
             title: 'XCLK frequency',
             required: true,
-            vals: [ "1M", "2M", "4M", "8M", "16M", "10M", "20M" ],
-            default: 4
+            vals: [ "1M", "2M", "4M", "8M", "10M", "15M", "20M", "24M" ],
+            default: 5
         },
         ir_mode: {
             type: 'list',
@@ -984,13 +983,14 @@
 
         const addValueChangeCallback = function(elem) {
             elem.change(function() {
-                const value = $(elem).prop("value");
-                const id = $(elem).attr('id');
-                const message = {
-                    controlMessageName: {
-                       id: value
-                    }
-                };
+                const name = $(this).prop('name');
+                const message = {};
+                message[controlMessageName] = {};
+                if (schema[name].type == 'checkbox') {
+                    message[controlMessageName][name] = $(this).is(":checked") ? 1 : 0;
+                } else {
+                    message[controlMessageName][name] = parseInt($(this).prop("value"));
+                }
                 if (controlSocket.readyState == WebSocket.OPEN) {
                     controlSocket.send(JSON.stringify(message));
                 }
@@ -1004,9 +1004,9 @@
 
             for (const input_name in schema) {
                 if (schema[input_name].type == 'checkbox') {
-                    data[input_name] = "on" == $(`#${input_name}Val`).val() ? 1 : 0;
+                    data[input_name] = ($(`#${input_name}Val`).is(":checked")) ? 1 : 0;
                 } else {
-                    data[input_name] = $(`#${input_name}Val`).val();
+                    data[input_name] = parseInt($(`#${input_name}Val`).val());
                 }
             }
             onSubmit(data);
@@ -1043,7 +1043,7 @@
                 if (input.default == true) {
                     $(`#${input_name}Val`).prop("checked", true);
                 }
-                addValueChangeCallback($(`#${input_name}`));
+                addValueChangeCallback($(`#${input_name}Val`));
             } else if (input.type == 'range') {
                 const range_input =
                     `<div class="input-group my-3">
@@ -1052,7 +1052,7 @@
                         </div>
                         <div class="col-sm-5 me-3">
                           <input class="form-range" type="range" id="${input_name}Range"
-                                 min="${input.minimum}" max="${input.maximum}" value="${input.default}" step="1"/>
+                                 min="${input.minimum}" max="${input.maximum}" name="${input_name}" value="${input.default}" step="1"/>
                         </div>
                         <div class="col-sm-2">
                           <input class="form-control" type="text" name="${input_name}" id="${input_name}Val"

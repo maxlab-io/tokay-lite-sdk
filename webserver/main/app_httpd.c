@@ -310,6 +310,7 @@ static esp_err_t http_handler_ws_control(httpd_req_t *req)
     if (req->method == HTTP_GET) {
         ESP_LOGI(TAG, "Handshake done, a new WS connection was opened");
         send_telemetry((void *)httpd_req_to_sockfd(req));
+        return ESP_OK;
     }
 
     httpd_ws_frame_t ws_pkt;
