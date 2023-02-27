@@ -104,7 +104,7 @@ static int default_config[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_AEC2] = 0,
     [AI_CAMERA_CONFIG_AWB_GAIN] = 1,
     [AI_CAMERA_CONFIG_AGC_GAIN] = 30,
-    [AI_CAMERA_CONFIG_AEC_VALUE] = 0,
+    [AI_CAMERA_CONFIG_AEC_VALUE] = 600,
     [AI_CAMERA_CONFIG_SPECIAL_EFFECT] = 0,
     [AI_CAMERA_CONFIG_WB_MODE] = 0,
     [AI_CAMERA_CONFIG_AE_LEVEL] = 0,
@@ -342,7 +342,10 @@ void ai_camera_settings_apply(void)
     }
 
     set_sensor_settings();
-    resume_camera_thread();
+    if (camera_ctx.settings_require_restart) {
+        resume_camera_thread();
+        camera_ctx.settings_require_restart = false;
+    }
 }
 
 void ai_camera_settings_apply_single_var(const cJSON *p_var)
