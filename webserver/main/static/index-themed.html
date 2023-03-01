@@ -1030,28 +1030,32 @@
         return socket;
     }
 
-    function fetchSettings(category, form, schema) {
+    function updateFormValues(form, schema, resp_json) {
+        for (const k in schema) {
+            if (k in resp_json) {
+                if (schema[k].type == 'checkbox') {
+                    $(`#${form} #${k}Val`).prop("checked", resp_json[k] == 1);
+                } else if (schema[k].type == 'range') {
+                    $(`#${form} #${k}Val`).val(resp_json[k]);
+                    $(`#${form} #${k}Range`).val(resp_json[k]);
+                } else if (schema[k].type == 'password') {
+                    /* Or what? */
+                    $(`#${form} #${k}Val`).val('********');
+                } else {
+                    $(`#${form} #${k}Val`).val(resp_json[k]);
+                }
+            }
+        }
+    }
+
+    function fetchSettings(category, update_cb) {
         let xhr = new XMLHttpRequest();
         xhr.open("GET", `/settings/${category}`);
         xhr.setRequestHeader("Accept", "application/json");
         xhr.setRequestHeader("Content-Type", "application/json");
         xhr.onload = () => {
             resp_json = JSON.parse(xhr.responseText);
-            for (const k in schema) {
-                if (k in resp_json) {
-                    if (schema[k].type == 'checkbox') {
-                        $(`#${form} #${k}Val`).prop("checked", resp_json[k] == 1);
-                    } else if (schema[k].type == 'range') {
-                        $(`#${form} #${k}Val`).val(resp_json[k]);
-                        $(`#${form} #${k}Range`).val(resp_json[k]);
-                    } else if (schema[k].type == 'password') {
-                        /* Or what? */
-                        $(`#${form} #${k}Val`).val('********');
-                    } else {
-                        $(`#${form} #${k}Val`).val(resp_json[k]);
-                    }
-                }
-            }
+            update_cb(resp_json);
         }
         xhr.send(null);
     }
@@ -1226,9 +1230,11 @@
     // trust me...
     var g_control_socket = null;
 
-    window.addEventListener('load', () => {
+    window.addEventListener('load', function() {
         g_control_socket = openTelemetrySocket();
-        fetchSettings('system', 'wifiForm', wifiSettingsSchema);
+        fetchSettings('system', function(resp) {
+            updateFormValues('wifiForm', wifiSettingsSchema, resp);
+        });
         defaultCanvas();
         const getSettingsSubmitCb = function(uri) {
             return function(formData) {
@@ -1243,26 +1249,38 @@
                              'cameraSettings', getSettingsSubmitCb('/settings/camera'));
         $('#cameraSettingsCard').attr('style', 'max-height:710px;');
         new PerfectScrollbar('#cameraSettingsCard');
-        fetchSettings('camera', 'cameraSettingsForm', cameraSettingsSchema);
+        fetchSettings('camera', function(resp) {
+            updateFormValues('cameraSettingsForm', cameraSettingsSchema, resp);
+        });
 
         generateSettingsForm(autoModeSettingsSchema, 'autoModeSettingsForm', null,
                              '', getSettingsSubmitCb('settings/auto_mode'));
         $('#autoModeSettingsCard').attr('style', 'max-height:710px;');
         new PerfectScrollbar('#autoModeSettingsCard');
-        fetchSettings('auto_mode', 'autoModeSettingsForm', autoModeSettingsSchema);
+        fetchSettings('auto_mode', function(resp) {
+            updateFormValues('autoModeSettingsForm', autoModeSettingsSchema, resp);
+        });
 
+        const postHASettings = function(formData) {
+            const message = {
+                "home_assistant": formData
+            };
+            getSettingsSubmitCb('settings/integrations')(message);
+        };
         generateSettingsForm(homeAssistantSettingsSchema, 'homeAssistantSettingsForm', null,
-                             '', getSettingsSubmitCb('settings/integrations'));
+                             '', postHASettings);
         $('#homeAssistantSettingsCard').attr('style', 'max-height:710px;');
         new PerfectScrollbar('#homeAssistantSettingsCard');
-        fetchSettings('integrations', 'homeAssistantSettingsForm', homeAssistantSettingsSchema);
-    });
+        fetchSettings('integrations', function(resp) {
+            updateFormValues('homeAssistantSettingsForm', homeAssistantSettingsSchema, resp['home_assistant']);
+        });
 
-    $(document).on('click', '.nav-link.active', function() {
-        $('.active').removeClass('active');
-        const tab_id = $(this).attr("data-bs-target")
-        $(this).addClass('active')
-        $(tab_id).addClass('active')
+        $(document).on('click', '.nav-link.active', function() {
+            $('.active').removeClass('active');
+            const tab_id = $(this).attr("data-bs-target")
+            $(this).addClass('active')
+            $(tab_id).addClass('active')
+        });
     });
 
   </script>
