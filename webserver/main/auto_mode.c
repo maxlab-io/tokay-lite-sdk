@@ -18,6 +18,7 @@ static const char *config_names[AUTO_MODE_CONFIG_MAX] = {
     [AUTO_MODE_CONFIG_ENABLED] = "auto_mode_enabled",
     [AUTO_MODE_CONFIG_PIR_ENABLED] = "pir_wakeup_enabled",
     [AUTO_MODE_CONFIG_TFLITE_TRIGGER_ENABLED] = "tflite_trigger_enabled",
+    [AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED] = "rtc_wakeup_enabled",
     [AUTO_MODE_CONFIG_WAKEUP_PERIOD_SECONDS] = "wakeup_period_seconds",
     [AUTO_MODE_CONFIG_INTEGRATION_ID] = "integration_id",
 };
@@ -26,6 +27,7 @@ static int default_config[AUTO_MODE_CONFIG_MAX] = {
     [AUTO_MODE_CONFIG_ENABLED] = 0,
     [AUTO_MODE_CONFIG_PIR_ENABLED] = 0,
     [AUTO_MODE_CONFIG_TFLITE_TRIGGER_ENABLED] = 0,
+    [AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED] = 0,
     [AUTO_MODE_CONFIG_WAKEUP_PERIOD_SECONDS] = 0,
     [AUTO_MODE_CONFIG_INTEGRATION_ID] = INTEGRATION_MAX,
 };
@@ -56,7 +58,11 @@ int auto_mode_run(bool *p_enable_pir_wakeup)
         ai_camera_fb_return(p_fb);
     }
     *p_enable_pir_wakeup = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_PIR_ENABLED])->valueint;
-    return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_WAKEUP_PERIOD_SECONDS])->valueint;
+    if (cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED])->valueint) {
+        return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_WAKEUP_PERIOD_SECONDS])->valueint;
+    } else {
+        return 0;
+    }
 }
 
 void auto_mode_settings_set_json(const cJSON *p_cfg)

@@ -43,6 +43,10 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.perfect-scrollbar/1.5.5/perfect-scrollbar.min.js"
     integrity="sha512-X41/A5OSxoi5uqtS6Krhqz8QyyD8E/ZbN7B4IaBSgqPLRbWVuXJXr9UwOujstj71SoVxh5vxgy7kmtd17xrJRw=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/iconify/3.1.0/iconify.min.js"
+    integrity="sha512-E5zagJczGRm5vRd4acej4RtUFCBd8JDedgljicTgnZrwLYzu4/GvImQ6VtJfxAtnPluq1b3tPNaz9yNuTKWQzw=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
   <!-- Page CSS -->
@@ -102,11 +106,11 @@
             </a>
           </li>
 
-          <!-- Autonomous mode -->
-          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-autonomous-mode">
+          <!-- Auto mode mode -->
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-auto-mode">
             <a href="javascript:void(0);" class="menu-link">
               <i class="menu-icon tf-icons bx bxs-cog"></i>
-              <div>Autonomous mode</div>
+              <div>Auto mode</div>
             </a>
           </li>
 
@@ -120,6 +124,14 @@
 
           <li class="menu-header small text-uppercase">
             <span class="menu-header-text">Integrations</span>
+          </li>
+
+          <!-- Home Assistant -->
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-home-assistant">
+            <a href="javascript:void(0);" class="menu-link">
+              <i class="menu-icon tf-icons bx bxs-home"> </i>
+              <div>Home Assistant</div>
+            </a>
           </li>
 
           <!-- Edge Impulse -->
@@ -383,9 +395,9 @@
                             </div>
                           </div>
                           <div class="row-md mb-0">
-                            <div class="card overflow-hidden" id="cameraSettingsButtons">
+                            <div class="card overflow-hidden">
                               <div class="card-body">
-                                <button type="submit" form="cameraSettingsForm" class="btn btn-primary w-100" id="cameraSettingsSave">Save</button>
+                                <button type="submit" form="cameraSettingsForm" class="btn btn-primary w-100">Save</button>
                               </div>
                             </div>
                           </div>
@@ -393,15 +405,28 @@
                       </div>
                       <!-- / image sensor tab -->
 
-                      <!-- autonomous mode tab -->
-                      <div class="tab-pane fade" id="tab-autonomous-mode" role="tabpanel">
-                        <div class="card">
-                          <h5 class="card-header">Autonomous mode</h5>
-                          <div class="card-body">
+                      <!-- Auto mode tab -->
+                      <div class="tab-pane fade" id="tab-auto-mode" role="tabpanel">
+                        <div class="col">
+                          <div class="row-md mb-2">
+                            <div class="card" id="autoModeSettingsCard">
+                              <h5 class="card-header">Auto Mode</h5>
+                              <div class="card-body pb-2">
+                                <form id="autoModeSettingsForm">
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="row-md mb-0">
+                            <div class="card overflow-hidden">
+                              <div class="card-body">
+                                <button type="submit" form="autoModeSettingsForm" class="btn btn-primary w-100">Save</button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <!-- / autonomous mode tab -->
+                      <!-- / auto mode tab -->
 
                       <!-- models tab -->
                       <div class="tab-pane fade" id="tab-models" role="tabpanel">
@@ -412,6 +437,29 @@
                         </div>
                       </div>
                       <!-- / models tab -->
+
+                      <!-- home assistant tab -->
+                      <div class="tab-pane fade" id="tab-home-assistant" role="tabpanel">
+                        <div class="col">
+                          <div class="row-md mb-2">
+                            <div class="card" id="homeAssistantSettingsCard">
+                              <h5 class="card-header">Home Assitant</h5>
+                              <div class="card-body pb-2">
+                                <form id="homeAssistantSettingsForm">
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="row-md mb-0">
+                            <div class="card overflow-hidden">
+                              <div class="card-body">
+                                <button type="submit" form="homeAssistantSettingsForm" class="btn btn-primary w-100">Save</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / edge impulse tab -->
 
                       <!-- edge impulse tab -->
                       <div class="tab-pane fade" id="tab-edge-impulse" role="tabpanel">
@@ -830,6 +878,62 @@
         }
     };
 
+    const autoModeSettingsSchema = {
+        auto_mode_enabled: {
+            type: 'checkbox',
+            title: 'Enable',
+            default: false,
+        },
+        pir_wakeup_enabled: {
+            type: 'checkbox',
+            title: 'Enable PIR wakeup',
+            default: false,
+        },
+        tflite_trigger_enabled: {
+            type: 'checkbox',
+            title: 'Enable TFLite processing',
+            default: false,
+        },
+        rtc_wakeup_enabled: {
+            type: 'checkbox',
+            title: 'Enable wakeup on RTC alarm',
+            default: false,
+        },
+        wakeup_period_settings: {
+            type: 'integer',
+            title: 'RTC alarm, seconds',
+            minimum: 0,
+            maximum: 31536000,
+            default: 0,
+        },
+        integration: {
+            type: 'list',
+            title: 'Integration to use',
+            vals: ['Home Assistant', 'AWS S3', 'ThingsBoard', 'Generic HTTP', 'Generic MQTT', 'None'],
+            default: 5,
+        }
+    };
+
+    const homeAssistantSettingsSchema = {
+        host: {
+            type: 'text',
+            title: 'Host',
+            default: '',
+        },
+        port: {
+            type: 'integer',
+            title: 'Port',
+            minimum: 1,
+            maximum: 65535,
+            default: 8123,
+        },
+        webhook_id: {
+            type: 'text',
+            title: 'Webhook ID',
+            default: '',
+        }
+    };
+
     function handlePlayStream() {
       var stream_metadata = null;
       let socket = new WebSocket("ws://" + location.host + "/stream");
@@ -940,11 +1044,11 @@
                     } else if (schema[k].type == 'range') {
                         $(`#${k}Val`).val(resp_json[k]);
                         $(`#${k}Range`).val(resp_json[k]);
-                    } else if (schema[k].type == 'list' || schema[k].type == 'text') {
-                        $(`#${k}Val`).val(resp_json[k]);
                     } else if (schema[k].type == 'password') {
                         /* Or what? */
                         $(`#${k}Val`).val('********');
+                    } else {
+                        $(`#${k}Val`).val(resp_json[k]);
                     }
                 }
             }
@@ -1008,8 +1112,10 @@
                 } else {
                     message[controlMessageName][name] = parseInt($(this).prop("value"));
                 }
-                if (controlSocket.readyState == WebSocket.OPEN) {
-                    controlSocket.send(JSON.stringify(message));
+                if (null != controlSocket) {
+                    if (controlSocket.readyState == WebSocket.OPEN) {
+                        controlSocket.send(JSON.stringify(message));
+                    }
                 }
             });
         }
@@ -1061,6 +1167,24 @@
                     $(`#${input_name}Val`).prop("checked", true);
                 }
                 addValueChangeCallback($(`#${input_name}Val`));
+            } else if (input.type == 'text') {
+                const text_input =
+                    `<div class="input-group my-3">
+                        <label for="${input_name}" class="col-md-4 pe-2 form-label">${input.title}</label>
+                        <input class="form-control col-md-8" name="${input_name}" type="text"
+                               id="${input_name}Val" value="${input.default}"/>
+                    </div>`;
+                formObject.append(text_input);
+                addValueChangeCallback($(`#${input_name}Val`));
+            } else if (input.type == 'integer') {
+                const text_input =
+                    `<div class="input-group my-3">
+                        <label for="${input_name}" class="col-md-4 pe-2 form-label">${input.title}</label>
+                        <input class="form-control col-md-8" name="${input_name}" type="number"
+                               id="${input_name}Val" value="${input.default}"/>
+                    </div>`;
+                formObject.append(text_input);
+                addValueChangeCallback($(`#${input_name}Val`));
             } else if (input.type == 'range') {
                 const range_input =
                     `<div class="input-group my-3">
@@ -1072,7 +1196,7 @@
                                  min="${input.minimum}" max="${input.maximum}" name="${input_name}" value="${input.default}" step="1"/>
                         </div>
                         <div class="col-sm-2">
-                          <input class="form-control" type="text" name="${input_name}" id="${input_name}Val"
+                          <input class="form-control" type="number" name="${input_name}" id="${input_name}Val"
                                  min="${input.minimum}" max="${input.maximum}" value="${input.default}" step="1"/>
                         </div>
                     </div>`;
@@ -1104,18 +1228,32 @@
         g_control_socket = openTelemetrySocket();
         fetchSettings('system', 'wifiForm', wifiSettingsSchema);
         defaultCanvas();
-        const cameraSettingsOnSubmit = function(formData) {
-            let xhr = new XMLHttpRequest();
-            xhr.open("POST", "/settings/camera");
-            xhr.setRequestHeader("Accept", "application/json");
-            xhr.setRequestHeader("Content-Type", "application/json");
-            xhr.send(JSON.stringify(formData));
+        const getSettingsSubmitCb = function(uri) {
+            return function(formData) {
+                let xhr = new XMLHttpRequest();
+                xhr.open("POST", uri);
+                xhr.setRequestHeader("Accept", "application/json");
+                xhr.setRequestHeader("Content-Type", "application/json");
+                xhr.send(JSON.stringify(formData));
+            };
         };
         generateSettingsForm(cameraSettingsSchema, 'cameraSettingsForm', g_control_socket,
-                             'cameraSettings', cameraSettingsOnSubmit);
+                             'cameraSettings', getSettingsSubmitCb('/settings/camera'));
         $('#cameraSettingsCard').attr('style', 'max-height:710px;');
-        const ps = new PerfectScrollbar('#cameraSettingsCard');
+        new PerfectScrollbar('#cameraSettingsCard');
         fetchSettings('camera', 'cameraSettingsForm', cameraSettingsSchema);
+
+        generateSettingsForm(autoModeSettingsSchema, 'autoModeSettingsForm', null,
+                             '', getSettingsSubmitCb('settings/auto_mode'));
+        $('#autoModeSettingsCard').attr('style', 'max-height:710px;');
+        new PerfectScrollbar('#autoModeSettingsCard');
+        fetchSettings('auto_mode', 'autoModeSettingsForm', autoModeSettingsSchema);
+
+        generateSettingsForm(homeAssistantSettingsSchema, 'homeAssistantSettingsForm', null,
+                             '', getSettingsSubmitCb('settings/integrations'));
+        $('#homeAssistantSettingsCard').attr('style', 'max-height:710px;');
+        new PerfectScrollbar('#homeAssistantSettingsCard');
+        fetchSettings('integrations', 'homeAssistantSettingsForm', homeAssistantSettingsSchema);
     });
 
     $(document).on('click', '.nav-link.active', function() {
