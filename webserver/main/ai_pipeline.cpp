@@ -147,7 +147,7 @@ cJSON *ai_pipeline_get_results(void)
 
 void ai_pipeline_deinit(void)
 {
-
+    // TODO
 }
 
 #ifdef __cplusplus

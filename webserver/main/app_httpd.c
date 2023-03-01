@@ -11,6 +11,8 @@
 #include "pir.h"
 #include "config.h"
 #include "ai_camera.h"
+#include "auto_mode.h"
+#include "integrations.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
@@ -34,13 +36,6 @@ typedef enum {
     HTTP_IMAGE_FORMAT_YUV422,
     HTTP_IMAGE_FORMAT_RGB565,
 } http_image_format_t;
-
-typedef enum {
-    HTTP_SETTINGS_TYPE_CAMERA,
-    HTTP_SETTINGS_TYPE_SYSTEM,
-
-    HTTP_SETTINGS_TYPE_MAX,
-} http_settings_type_t;
 
 static esp_err_t http_handler_get_static_page(httpd_req_t *req);
 static esp_err_t http_handler_get_picture(httpd_req_t *req);
@@ -94,32 +89,16 @@ static const httpd_uri_t handler_rgb565 = {
     .user_ctx  = (void *)HTTP_IMAGE_FORMAT_RGB565,
 };
 
-static const httpd_uri_t handler_get_camera_settings = {
-    .uri       = "/settings/camera",
+static const httpd_uri_t handler_get_settings = {
+    .uri       = "/settings/*",
     .method    = HTTP_GET,
     .handler   = http_handler_get_settings,
-    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_CAMERA,
 };
 
-static const httpd_uri_t handler_get_system_settings = {
-    .uri       = "/settings/system",
-    .method    = HTTP_GET,
-    .handler   = http_handler_get_settings,
-    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_SYSTEM,
-};
-
-static const httpd_uri_t handler_set_camera_settings = {
-    .uri       = "/settings/camera",
+static const httpd_uri_t handler_set_settings = {
+    .uri       = "/settings/*",
     .method    = HTTP_POST,
     .handler   = http_handler_set_settings,
-    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_CAMERA,
-};
-
-static const httpd_uri_t handler_set_system_settings = {
-    .uri       = "/settings/system",
-    .method    = HTTP_POST,
-    .handler   = http_handler_set_settings,
-    .user_ctx  = (void *)HTTP_SETTINGS_TYPE_SYSTEM,
 };
 
 static const httpd_uri_t handler_ws_control = {
@@ -151,7 +130,7 @@ void app_httpd_start(bool wifi_setup)
                              pdFALSE, NULL, telemetry_timer_cb);
     }
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.uri_match_fn = NULL;
+    config.uri_match_fn = httpd_uri_match_wildcard;
     config.server_port = 80;
     config.lru_purge_enable = true;
     config.core_id = 0;
@@ -160,17 +139,15 @@ void app_httpd_start(bool wifi_setup)
 
     if (wifi_setup) {
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_wifi_setup));
-        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_system_settings));
-        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_system_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_settings));
     } else {
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_index));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_jpeg));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_yuv422));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_rgb565));
-        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_camera_settings));
-        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_system_settings));
-        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_camera_settings));
-        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_system_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_get_settings));
+        ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_set_settings));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_ws_control));
         ESP_ERROR_CHECK(httpd_register_uri_handler(app_httpd_ctx.http_server_handle, &handler_stream));
     }
@@ -239,13 +216,18 @@ static esp_err_t http_handler_get_picture(httpd_req_t *req)
 
 static esp_err_t http_handler_get_settings(httpd_req_t *req)
 {
-    http_settings_type_t settings_type = (http_settings_type_t)req->user_ctx;
     const cJSON *p_root = NULL;
 
-    if (HTTP_SETTINGS_TYPE_CAMERA == settings_type) {
+    const char *p_uri_end = strrchr(req->uri, '/') + 1;
+
+    if (0 == strcmp(p_uri_end, "camera")) {
         p_root = ai_camera_settings_get_json();
-    } else if (HTTP_SETTINGS_TYPE_SYSTEM == settings_type) {
+    } else if (0 == strcmp(p_uri_end, "system")) {
         p_root = system_settings_get_json();
+    } else if (0 == strcmp(p_uri_end, "auto_mode")) {
+        p_root = auto_mode_settings_get_json();
+    } else if (0 == strcmp(p_uri_end, "integrations")) {
+        p_root = integrations_settings_get_json();
     }
 
     char *p_response = cJSON_Print(p_root);
@@ -265,7 +247,6 @@ fail:
 
 static esp_err_t http_handler_set_settings(httpd_req_t *req)
 {
-    http_settings_type_t settings_type = (http_settings_type_t)req->user_ctx;
     if (req->content_len > SETTINGS_JSON_MAX_SIZE) {
         ESP_LOGE(TAG, "Settings JSON too big %d", req->content_len);
         return ESP_FAIL;
@@ -291,12 +272,18 @@ static esp_err_t http_handler_set_settings(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    if (HTTP_SETTINGS_TYPE_CAMERA == settings_type) {
+    const char *p_uri_end = strrchr(req->uri, '/') + 1;
+
+    if (0 == strcmp(p_uri_end, "camera")) {
         ai_camera_settings_set_json(p_settings);
         ai_camera_settings_apply();
-    } else if (HTTP_SETTINGS_TYPE_SYSTEM == settings_type) {
+    } else if (0 == strcmp(p_uri_end, "system")) {
         system_settings_set_json(p_settings);
         system_settings_apply();
+    } else if (0 == strcmp(p_uri_end, "auto_mode")) {
+        auto_mode_settings_set_json(p_settings);
+    } else if (0 == strcmp(p_uri_end, "integrations")) {
+        integrations_settings_set_json(p_settings);
     }
 
     cJSON_Delete(p_settings);
