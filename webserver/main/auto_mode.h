@@ -13,6 +13,8 @@ typedef enum {
     AUTO_MODE_CONFIG_MAX,
 } auto_mode_config_t;
 
+void auto_mode_init(void);
+
 bool auto_mode_enabled(void);
 
 /**

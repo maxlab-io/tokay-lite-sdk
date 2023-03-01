@@ -21,6 +21,8 @@
 #include "app_httpd.h"
 #include "network.h"
 #include "json_settings_helpers.h"
+#include "auto_mode.h"
+#include "integrations.h"
 
 #define TAG "main"
 
@@ -123,6 +125,8 @@ static void app_task(void *pvArg)
     event_queue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(app_event_t));
 
     network_init("ai-camera", wifi_connection_callback);
+    auto_mode_init();
+    integrations_init();
 
     {
         const char *p_ssid = json_settings_get_string_or(p_system_settings, "wifi_ssid", "");
@@ -140,7 +144,37 @@ static void app_task(void *pvArg)
         }
     }
 
+    const bool is_pir_triggered = pir_is_motion_detected();
+    const bool is_timer_triggered = bsp_get_timer_alarm();
+
+    const bool enter_auto_mode = (is_pir_triggered || is_timer_triggered) && auto_mode_enabled();
+
     ai_camera_init(BSP_I2C_BUS_ID);
+
+    if (!ap_mode && enter_auto_mode) {
+        ESP_LOGI(TAG, "Running in auto mode");
+        app_event_t event = APP_EVENT_MAX;
+        TickType_t start = xTaskGetTickCount();
+        ESP_LOGI(TAG, "Waiting for WiFi connection...");
+        do {
+            xQueueReceive(event_queue, &event, portMAX_DELAY);
+        } while (APP_EVENT_WIFI_CONNECTED != event && xTaskGetTickCount() - start < pdMS_TO_TICKS(10000));
+        bool enable_pir_wakeup = false;
+        const int sleep_duration_seconds = auto_mode_run(&enable_pir_wakeup);
+        if (enable_pir_wakeup) {
+            pir_enable();
+        } else {
+            pir_disable();
+        }
+        if (0 == sleep_duration_seconds) {
+            bsp_deep_sleep(UINT32_MAX);
+        } else {
+            bsp_deep_sleep(sleep_duration_seconds);
+            while (1) {
+                vTaskDelay(100);
+            }
+        }
+    }
 
     while (1) {
         app_event_t event = APP_EVENT_MAX;

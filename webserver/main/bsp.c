@@ -123,6 +123,18 @@ bool bsp_deep_sleep(uint32_t sleep_duration_seconds)
     return true;
 }
 
+bool bsp_get_timer_alarm(void)
+{
+    bool active = false;
+    const bool success = ext_rtc_alarm_active(&active);
+    return success && active;
+}
+
+bool bsp_get_usr_button_state(void)
+{
+    return gpio_get_level(BUTTON_PIN);
+}
+
 int8_t apds9306_i2c_read(uint8_t address, uint8_t reg, uint8_t *data, uint16_t count)
 {
     int8_t ret;

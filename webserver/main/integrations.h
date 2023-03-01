@@ -21,4 +21,4 @@ const cJSON *integrations_get(integration_t integration);
 const cJSON *integrations_settings_get_json(void);
 void integrations_settings_set_json(const cJSON *p_cfg);
 
-bool integration_execute(integration_t integration, const void *p_buf, size_t len);
+bool integrations_run(integration_t integration, const void *p_buf, size_t len);

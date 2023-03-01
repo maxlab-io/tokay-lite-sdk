@@ -45,13 +45,16 @@ void integrations_settings_set_json(const cJSON *p_cfg)
     if (!cJSON_Compare(p_settings, p_cfg, false)) {
         cJSON_Delete(p_settings);
         p_settings = cJSON_Duplicate(p_cfg, true);
+        // TODO: make sure all integration configs are merged into one JSON
+        json_settings_save_to_nvs("integrations", p_settings);
     }
 }
 
-bool integration_execute(integration_t integration, const void *p_buf, size_t len)
+bool integrations_run(integration_t integration, const void *p_buf, size_t len)
 {
     const cJSON *p_cfg = cJSON_GetObjectItem(p_settings, integration_names[integration]);
     if (NULL == p_cfg) {
+        ESP_LOGE(TAG, "Failed to run integration %d", integration);
         return false;
     }
     switch (integration) {
@@ -64,9 +67,11 @@ bool integration_execute(integration_t integration, const void *p_buf, size_t le
 
 static bool home_assistant_upload_picture(const cJSON *p_cfg, const void *p_buf, size_t len)
 {
+    ESP_LOGI(TAG, "Running Home Assistant integration");
     const char *host = cJSON_GetObjectItem(p_cfg, "host")->valuestring;
     const int port = cJSON_GetObjectItem(p_cfg, "port")->valueint;
     const char *webhook_id = cJSON_GetObjectItem(p_cfg, "webhook_id")->valuestring;
+    ESP_LOGI(TAG, "Host %s port %d webhook_id %s", host, port, webhook_id);
     esp_http_client_config_t config = {
         .host = host,
         .port = port,

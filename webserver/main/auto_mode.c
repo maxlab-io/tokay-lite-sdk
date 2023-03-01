@@ -36,7 +36,6 @@ void auto_mode_init(void)
 {
     p_settings = json_settings_load_from_nvs("auto_mode");
     if (NULL == p_settings) {
-        ESP_LOGE(TAG, "Failed to load auto_mode settings from NVS");
         p_settings = auto_mode_settings_get_default();
         json_settings_save_to_nvs("auto_mode", p_settings);
     }
@@ -51,11 +50,17 @@ int auto_mode_run(bool *p_enable_pir_wakeup)
 {
     ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, NULL, NULL, NULL);
     vTaskDelay(pdMS_TO_TICKS(5000));
-    camera_fb_t *p_fb = ai_camera_get_frame(PIXFORMAT_JPEG, pdMS_TO_TICKS(1000));
+    camera_fb_t *p_fb = ai_camera_get_frame(PIXFORMAT_JPEG, pdMS_TO_TICKS(3000));
     if (NULL != p_fb) {
-        const integration_t integration_id = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_INTEGRATION_ID])->valueint;
-        integration_execute(integration_id, p_fb->buf, p_fb->len);
+        const cJSON *p_integration_id = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_INTEGRATION_ID]);
+        if (NULL != p_integration_id) {
+            integrations_run(p_integration_id->valueint, p_fb->buf, p_fb->len);
+        } else {
+            ESP_LOGE(TAG, "No integration assigned");
+        }
         ai_camera_fb_return(p_fb);
+    } else {
+        ESP_LOGI(TAG, "Failed to get a frame");
     }
     *p_enable_pir_wakeup = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_PIR_ENABLED])->valueint;
     if (cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED])->valueint) {
@@ -69,7 +74,8 @@ void auto_mode_settings_set_json(const cJSON *p_cfg)
 {
     if (!cJSON_Compare(p_settings, p_cfg, false)) {
         cJSON_Delete(p_settings);
-        p_settings = cJSON_Duplicate(p_settings, true);
+        p_settings = cJSON_Duplicate(p_cfg, true);
+        json_settings_save_to_nvs("auto_mode", p_settings);
     }
 }
 

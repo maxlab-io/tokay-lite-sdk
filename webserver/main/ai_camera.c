@@ -249,10 +249,10 @@ void ai_camera_stop(void)
 
 camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
 {
-    if (camera_ctx.running) {
+    if (!camera_ctx.running) {
         return NULL;
     }
-    if (!stop_camera_thread(pdMS_TO_TICKS(5000))) {
+    if (!stop_camera_thread(timeout_ms)) {
         return NULL;
     }
     if (format != PIXFORMAT_JPEG) {
@@ -549,7 +549,6 @@ static cJSON *ai_camera_settings_get_default(void)
 static int ai_camera_settings_get_value(ai_camera_config_t config)
 {
     const int ret = json_settings_get_int_or(camera_ctx.p_settings, config_names[config], default_config[config]);
-    ESP_LOGI(TAG, "%s=%d", config_names[config], ret);
     return ret;
 }
 

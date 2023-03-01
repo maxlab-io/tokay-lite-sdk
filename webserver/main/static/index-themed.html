@@ -906,7 +906,7 @@
             maximum: 31536000,
             default: 0,
         },
-        integration: {
+        integration_id: {
             type: 'list',
             title: 'Integration to use',
             vals: ['Home Assistant', 'AWS S3', 'ThingsBoard', 'Generic HTTP', 'Generic MQTT', 'None'],
@@ -918,7 +918,7 @@
         host: {
             type: 'text',
             title: 'Host',
-            default: '',
+            default: 'localhost',
         },
         port: {
             type: 'integer',
@@ -1040,15 +1040,15 @@
             for (const k in schema) {
                 if (k in resp_json) {
                     if (schema[k].type == 'checkbox') {
-                        $(`#${k}Val`).prop("checked", resp_json[k] == 1);
+                        $(`#${form} #${k}Val`).prop("checked", resp_json[k] == 1);
                     } else if (schema[k].type == 'range') {
-                        $(`#${k}Val`).val(resp_json[k]);
-                        $(`#${k}Range`).val(resp_json[k]);
+                        $(`#${form} #${k}Val`).val(resp_json[k]);
+                        $(`#${form} #${k}Range`).val(resp_json[k]);
                     } else if (schema[k].type == 'password') {
                         /* Or what? */
-                        $(`#${k}Val`).val('********');
+                        $(`#${form} #${k}Val`).val('********');
                     } else {
-                        $(`#${k}Val`).val(resp_json[k]);
+                        $(`#${form} #${k}Val`).val(resp_json[k]);
                     }
                 }
             }
@@ -1128,8 +1128,10 @@
             for (const input_name in schema) {
                 if (schema[input_name].type == 'checkbox') {
                     data[input_name] = ($(`#${input_name}Val`).is(":checked")) ? 1 : 0;
-                } else {
+                } else if (schema[input_name].type == 'integer' || schema[input_name].type == 'range') {
                     data[input_name] = parseInt($(`#${input_name}Val`).val());
+                } else {
+                    data[input_name] = $(`#${input_name}Val`).val();
                 }
             }
             onSubmit(data);
