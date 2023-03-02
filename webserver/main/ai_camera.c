@@ -103,7 +103,7 @@ static int default_config[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_VFLIP] = 1,
     [AI_CAMERA_CONFIG_AEC2] = 0,
     [AI_CAMERA_CONFIG_AWB_GAIN] = 1,
-    [AI_CAMERA_CONFIG_AGC_GAIN] = 30,
+    [AI_CAMERA_CONFIG_AGC_GAIN] = 0,
     [AI_CAMERA_CONFIG_AEC_VALUE] = 600,
     [AI_CAMERA_CONFIG_SPECIAL_EFFECT] = 0,
     [AI_CAMERA_CONFIG_WB_MODE] = 0,
@@ -113,14 +113,14 @@ static int default_config[AI_CAMERA_CONFIG_MAX] = {
     [AI_CAMERA_CONFIG_WPC] = 1,
     [AI_CAMERA_CONFIG_RAW_GMA] = 0,
     [AI_CAMERA_CONFIG_LENC] = 1,
-    [AI_CAMERA_CONFIG_XCLK_FREQ] = 5,
+    [AI_CAMERA_CONFIG_XCLK_FREQ] = 3,
     [AI_CAMERA_CONFIG_IR_MODE] = AI_CAMERA_IR_MODE_AUTO,
     [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH] = AI_CAMERA_IR_THRESH_HIGH_DEFAULT,
     [AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW] = AI_CAMERA_IR_THRESH_LOW_DEFAULT,
     [AI_CAMERA_CONFIG_IR_BRIGHTNESS] = AI_CAMERA_IR_BRIGHTNESS_DEFAULT,
 };
 
-static int xclk_freq_map[] = { 1e6, 2e6, 4e6, 8e6, 10e6, 15e6, 20e6, 24e6 };
+static int xclk_freq_map[] = { 6e6, 8e6, 10e6, 15e6, 20e6, 24e6 };
 static int resolution_map[] = { FRAMESIZE_96X96, FRAMESIZE_QQVGA, FRAMESIZE_QCIF,
     FRAMESIZE_QVGA, FRAMESIZE_VGA, FRAMESIZE_SVGA, FRAMESIZE_768X768, FRAMESIZE_HD, FRAMESIZE_UXGA};
 
@@ -216,6 +216,9 @@ void ai_camera_init(int i2c_bus_id)
     gpio_config(&io_conf);
 
     camera_config.sccb_i2c_port = i2c_bus_id;
+    const int xclk = ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ);
+    camera_config.frame_size = resolution_map[ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION)];
+    camera_config.xclk_freq_hz = xclk_freq_map[ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ)];
     camera_ctx.camera_thread_commands = xEventGroupCreate();
 
     camera_ctx.ir_mode_timer = xTimerCreate("ir_tmr", pdMS_TO_TICKS(IR_MODE_TIMER_PERIOD_MS),
@@ -326,8 +329,10 @@ const cJSON *ai_camera_settings_get_json(void)
 void ai_camera_settings_apply(void)
 {
     if (!camera_ctx.running) {
-        camera_config.frame_size = ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION);
-        camera_config.xclk_freq_hz = ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ);
+        camera_config.frame_size = resolution_map[ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION)];
+        camera_config.xclk_freq_hz = xclk_freq_map[ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ)];
+        ESP_LOGI(TAG, "Setting frame_size to %d", camera_config.frame_size);
+        ESP_LOGI(TAG, "Setting xclk to %d", camera_config.xclk_freq_hz);
         return;
     }
     if (camera_ctx.settings_require_restart) {

@@ -833,8 +833,8 @@
             type: 'list',
             title: 'XCLK frequency',
             required: true,
-            vals: [ "1M", "2M", "4M", "8M", "10M", "15M", "20M", "24M" ],
-            default: 5
+            vals: [ "6M", "8M", "10M", "15M", "20M", "24M" ],
+            default: 3
         },
         ir_mode: {
             type: 'list',
@@ -1132,10 +1132,10 @@
             for (const input_name in schema) {
                 if (schema[input_name].type == 'checkbox') {
                     data[input_name] = ($(`#${input_name}Val`).is(":checked")) ? 1 : 0;
-                } else if (schema[input_name].type == 'integer' || schema[input_name].type == 'range') {
-                    data[input_name] = parseInt($(`#${input_name}Val`).val());
-                } else {
+                } else if (schema[input_name].type == 'text') {
                     data[input_name] = $(`#${input_name}Val`).val();
+                } else {
+                    data[input_name] = parseInt($(`#${input_name}Val`).val());
                 }
             }
             onSubmit(data);
