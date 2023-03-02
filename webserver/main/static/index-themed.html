@@ -1272,7 +1272,9 @@
         $('#homeAssistantSettingsCard').attr('style', 'max-height:710px;');
         new PerfectScrollbar('#homeAssistantSettingsCard');
         fetchSettings('integrations', function(resp) {
-            updateFormValues('homeAssistantSettingsForm', homeAssistantSettingsSchema, resp['home_assistant']);
+            if ('home_assistant' in resp) {
+                updateFormValues('homeAssistantSettingsForm', homeAssistantSettingsSchema, resp['home_assistant']);
+            }
         });
 
         $(document).on('click', '.nav-link.active', function() {
