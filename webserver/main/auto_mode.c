@@ -1,8 +1,11 @@
 #include "auto_mode.h"
 
+#include <string.h>
+
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 
 #include "json_settings_helpers.h"
 #include "ai_camera.h"
@@ -46,22 +49,60 @@ bool auto_mode_enabled(void)
     return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_ENABLED])->valueint;
 }
 
+typedef struct {
+    int frame_counter;
+    int max_frames;
+    void **p_bufs;
+    size_t *p_lens;
+    void *p_psram_iter;
+    SemaphoreHandle_t done_sem;
+} frame_ctx_t;
+
+static void frame_cb(pixformat_t format, const uint8_t *p_buf, uint32_t len, void *ctx)
+{
+    frame_ctx_t *p_frame_ctx = ctx;
+    if (p_frame_ctx->frame_counter == p_frame_ctx->max_frames) {
+        xSemaphoreGive(p_frame_ctx->done_sem);
+    } else {
+        memcpy(p_frame_ctx->p_psram_iter, p_buf, len);
+        p_frame_ctx->p_bufs[p_frame_ctx->frame_counter] = p_frame_ctx->p_psram_iter;
+        p_frame_ctx->p_lens[p_frame_ctx->frame_counter] = len;
+        p_frame_ctx->p_psram_iter += len;
+        p_frame_ctx->frame_counter++;
+    }
+}
+
 int auto_mode_run(bool *p_enable_pir_wakeup)
 {
-    ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, NULL, NULL, NULL);
-    vTaskDelay(pdMS_TO_TICKS(5000));
-    camera_fb_t *p_fb = ai_camera_get_frame(PIXFORMAT_JPEG, pdMS_TO_TICKS(3000));
-    if (NULL != p_fb) {
-        const cJSON *p_integration_id = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_INTEGRATION_ID]);
-        if (NULL != p_integration_id) {
-            integrations_run(p_integration_id->valueint, p_fb->buf, p_fb->len);
-        } else {
-            ESP_LOGE(TAG, "No integration assigned");
+#define NUM_FRAMES 30
+    void *psram_buf = heap_caps_malloc(1024 * 1024 * 4, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+    void *bufs[NUM_FRAMES] = { 0 };
+    size_t lens[NUM_FRAMES] = { 0 };
+    frame_ctx_t frame_ctx = {
+        .frame_counter = 0,
+        .max_frames = NUM_FRAMES,
+        .p_bufs = bufs,
+        .p_lens = lens,
+        .p_psram_iter = psram_buf,
+        .done_sem = xSemaphoreCreateBinary(),
+    };
+    ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, frame_cb, NULL, &frame_ctx);
+    xSemaphoreTake(frame_ctx.done_sem, portMAX_DELAY);
+    ai_camera_stop();
+
+    const cJSON *p_integration_id = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_INTEGRATION_ID]);
+    if (NULL != p_integration_id) {
+        for (int i = 0; i < NUM_FRAMES; i++) {
+            if (!integrations_run(p_integration_id->valueint, bufs[i], lens[i])) {
+                break;
+            }
         }
-        ai_camera_fb_return(p_fb);
     } else {
-        ESP_LOGI(TAG, "Failed to get a frame");
+        ESP_LOGE(TAG, "No integration assigned");
     }
+
+    heap_caps_free(psram_buf);
+    vSemaphoreDelete(frame_ctx.done_sem);
     *p_enable_pir_wakeup = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_PIR_ENABLED])->valueint;
     if (cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED])->valueint) {
         return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_WAKEUP_PERIOD_SECONDS])->valueint;

@@ -45,8 +45,7 @@ static esp_err_t http_handler_ws_control(httpd_req_t *req);
 
 static esp_err_t http_handler_get_stream(httpd_req_t *req);
 static void camera_metadata_cb(cJSON *p_meta_root, void *p_ctx);
-static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size,
-        bool start_of_frame, void *p_ctx);
+static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size, void *p_ctx);
 
 static void telemetry_timer_cb(TimerHandle_t handle);
 static void send_telemetry(void *arg);
@@ -436,8 +435,7 @@ static void camera_metadata_cb(cJSON *p_meta_root, void *p_ctx)
     }
 }
 
-static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size,
-                                     bool start_of_frame, void *p_ctx)
+static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t size, void *p_ctx)
 {
     const int fd = (int)p_ctx;
 

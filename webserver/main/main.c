@@ -170,9 +170,10 @@ static void app_task(void *pvArg)
             bsp_deep_sleep(UINT32_MAX);
         } else {
             bsp_deep_sleep(sleep_duration_seconds);
-            while (1) {
-                vTaskDelay(100);
-            }
+        }
+
+        while (1) {
+            vTaskDelay(100);
         }
     }
 

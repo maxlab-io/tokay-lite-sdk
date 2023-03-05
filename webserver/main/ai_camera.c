@@ -216,7 +216,6 @@ void ai_camera_init(int i2c_bus_id)
     gpio_config(&io_conf);
 
     camera_config.sccb_i2c_port = i2c_bus_id;
-    const int xclk = ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ);
     camera_config.frame_size = resolution_map[ai_camera_settings_get_value(AI_CAMERA_CONFIG_RESOLUTION)];
     camera_config.xclk_freq_hz = xclk_freq_map[ai_camera_settings_get_value(AI_CAMERA_CONFIG_XCLK_FREQ)];
     camera_ctx.camera_thread_commands = xEventGroupCreate();
@@ -252,7 +251,7 @@ void ai_camera_stop(void)
 
 camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
 {
-    if (!camera_ctx.running) {
+    if (camera_ctx.running) {
         return NULL;
     }
     if (!stop_camera_thread(timeout_ms)) {
@@ -506,7 +505,7 @@ static void camera_thread_entry(void *pvParam)
                 ai_pipeline_start(p_frame->buf, p_frame->len);
             }
             if (NULL != camera_ctx.p_frame_cb) {
-                camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, true, camera_ctx.p_cb_ctx);
+                camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, camera_ctx.p_cb_ctx);
             }
             if (AI_CAMERA_PIPELINE_CNN == current_pipeline) {
                 ai_pipeline_wait_decode_finish(pdMS_TO_TICKS(600));
