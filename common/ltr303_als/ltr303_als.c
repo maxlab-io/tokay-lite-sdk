@@ -26,7 +26,7 @@
 #define ALS_MEAS_RATE_100MS_REG_VAL 1
 #define ALS_IT_TIME_100MS_CONV_VAL 1
 
-#define ALS_MEASUREMENT_DURATION_MS 25
+#define ALS_MEASUREMENT_DURATION_MS 100
 #define ALS_MAX_POLL_TIME_MS 100
 
 #define ALS_RESET_DELAY_MS 20
@@ -91,8 +91,8 @@ bool ltr_303_als_init(int i2c_bus_id, ltr303_gain_t gain)
 
 bool ltr_303_als_start_measurement(int *p_measurement_time_ms)
 {
-    *p_measurement_time_ms = ALS_MEASUREMENT_DURATION_MS;
-    return ltr_303_als_write(ALS_MAIN_CTRL_ADDR, ALS_MAIN_CTRL_DATA | gain_reg_map[ltr303_gain]);
+    *p_measurement_time_ms = 200;
+    return ltr_303_als_write(ALS_MAIN_CTRL_ADDR, ALS_MAIN_CTRL_DATA | (gain_reg_map[ltr303_gain] << 2));
 }
 
 bool ltr_303_als_read_measurement(float *p_out)
@@ -104,17 +104,19 @@ bool ltr_303_als_read_measurement(float *p_out)
             return false;
         }
 
-        if (ltr_303_als_read(ALS_STATUS_ADDR, &als_status, 1)) {
+        als_status = 0;
+        if (!ltr_303_als_read(ALS_STATUS_ADDR, &als_status, 1)) {
             return false;
         }
+        vTaskDelay(pdMS_TO_TICKS(50));
     } while ((als_status & ALS_STATUS_NEW_DATA_BIT) == 0);
 
     uint8_t als_data[4] = { 0 };
     if (!ltr_303_als_read(ALS_DATA_ADDR, als_data, sizeof(als_data))) {
         return false;
     }
-    const uint8_t ch0 = als_data[1] | (als_data[2] << 8);
-    const uint8_t ch1 = als_data[0] | (als_data[1] << 8);
+    const uint16_t ch0 = als_data[1] | (als_data[2] << 8);
+    const uint16_t ch1 = als_data[0] | (als_data[1] << 8);
     *p_out = get_visible_lux(ch0, ch1, gain_value_map[ltr303_gain], ALS_IT_TIME_100MS_CONV_VAL);
     return true;
 }
