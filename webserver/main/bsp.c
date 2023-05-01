@@ -24,8 +24,7 @@
 #define I2C_SCL_PIN 3
 
 #define BUTTON_DEBOUNCE_TIME_MS 50
-//#define BUTTON_PIN              41LLU
-#define BUTTON_PIN              0
+#define BUTTON_PIN              41LLU
 
 #define PWR_EN_PIN              14
 
