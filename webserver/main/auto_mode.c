@@ -13,6 +13,8 @@
 
 #define TAG "auto_mode"
 
+#define NUM_FRAMES_TO_UPLOAD 1
+
 static cJSON *p_settings;
 
 static cJSON *auto_mode_settings_get_default(void);
@@ -74,13 +76,12 @@ static void frame_cb(pixformat_t format, const uint8_t *p_buf, uint32_t len, voi
 
 int auto_mode_run(bool *p_enable_pir_wakeup)
 {
-#define NUM_FRAMES 30
     void *psram_buf = heap_caps_malloc(1024 * 1024 * 4, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
-    void *bufs[NUM_FRAMES] = { 0 };
-    size_t lens[NUM_FRAMES] = { 0 };
+    void *bufs[NUM_FRAMES_TO_UPLOAD] = { 0 };
+    size_t lens[NUM_FRAMES_TO_UPLOAD] = { 0 };
     frame_ctx_t frame_ctx = {
         .frame_counter = 0,
-        .max_frames = NUM_FRAMES,
+        .max_frames = NUM_FRAMES_TO_UPLOAD,
         .p_bufs = bufs,
         .p_lens = lens,
         .p_psram_iter = psram_buf,
@@ -92,7 +93,7 @@ int auto_mode_run(bool *p_enable_pir_wakeup)
 
     const cJSON *p_integration_id = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_INTEGRATION_ID]);
     if (NULL != p_integration_id) {
-        for (int i = 0; i < NUM_FRAMES; i++) {
+        for (int i = 0; i < NUM_FRAMES_TO_UPLOAD; i++) {
             if (!integrations_run(p_integration_id->valueint, bufs[i], lens[i])) {
                 break;
             }

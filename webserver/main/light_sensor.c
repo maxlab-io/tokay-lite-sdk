@@ -1,38 +1,22 @@
 #include "light_sensor.h"
 
 #include "esp_log.h"
-#include "apds9306.h"
-#include "apds9306_errors.h"
+#include "ltr303_als.h"
 
 #define TAG "LIGHT_SENS"
 
-#define ALS_GAIN APDS9306_ALS_GAIN_3
+#define ALS_GAIN LTR303_GAIN_4X
 
 void light_sensor_init(int i2c_bus_id)
 {
     (void)i2c_bus_id;
-    if (APDS9306_OK != apds9306_reset()) {
-        ESP_LOGE(TAG, "Failed to reset APDS9306");
-        return;
-    }
-
-    if (APDS9306_OK != apds9306_probe()) {
-        ESP_LOGE(TAG, "Failed to probe APDS9306");
-        return;
-    }
-
-    if (APDS9306_OK != apds9306_set_als_gain(ALS_GAIN)) {
-        ESP_LOGE(TAG, "Failed to set APDS9306 gain");
-        return;
-    }
-
-    if (APDS9306_OK != apds9306_als_enable()) {
-        ESP_LOGE(TAG, "Failed to set APDS9306 gain");
+    if (ltr_303_als_init(i2c_bus_id, ALS_GAIN)) {
+        ESP_LOGE(TAG, "Failed to find ALS LTR303");
         return;
     }
 }
 
 bool light_sensor_read(float *p_out)
 {
-    return APDS9306_OK == apds9306_read_wait(p_out);
+    return ltr_303_als_measure(p_out);
 }
