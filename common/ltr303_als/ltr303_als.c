@@ -1,5 +1,7 @@
 #include "ltr303_als.h"
 
+#include <stdint.h>
+
 #include "driver/i2c.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -59,7 +61,7 @@ bool ltr_303_als_init(int i2c_bus_id, ltr303_gain_t gain)
     ltr303_als_i2c_bus_id = i2c_bus_id;
 
     uint8_t part_id = 0;
-    if (!ltr_303_als_read(PART_ID_ADDR, part_id, 1)) {
+    if (!ltr_303_als_read(PART_ID_ADDR, &part_id, 1)) {
         return false;
     }
 
@@ -87,14 +89,14 @@ bool ltr_303_als_init(int i2c_bus_id, ltr303_gain_t gain)
     return true;
 }
 
-bool ltr_303_als_measure(float *p_out)
+bool ltr_303_als_start_measurement(int *p_measurement_time_ms)
 {
-    bool ret = ltr_303_als_write(ALS_MAIN_CTRL_ADDR, ALS_MAIN_CTRL_DATA | gain_reg_map[ltr303_gain]);
-    if (!ret) {
-        return ret;
-    }
-    vTaskDelay(pdMS_TO_TICKS(ALS_MEASUREMENT_DURATION_MS));
+    *p_measurement_time_ms = ALS_MEASUREMENT_DURATION_MS;
+    return ltr_303_als_write(ALS_MAIN_CTRL_ADDR, ALS_MAIN_CTRL_DATA | gain_reg_map[ltr303_gain]);
+}
 
+bool ltr_303_als_read_measurement(float *p_out)
+{
     uint8_t als_status = 0;
     TickType_t start = xTaskGetTickCount();
     do {
@@ -102,16 +104,14 @@ bool ltr_303_als_measure(float *p_out)
             return false;
         }
 
-        ret = ltr_303_als_read(ALS_STATUS_ADDR, &als_status, 1);
-        if (!ret) {
-            return ret;
+        if (ltr_303_als_read(ALS_STATUS_ADDR, &als_status, 1)) {
+            return false;
         }
     } while ((als_status & ALS_STATUS_NEW_DATA_BIT) == 0);
 
     uint8_t als_data[4] = { 0 };
-    ret = ltr_303_als_read(ALS_DATA_ADDR, als_data, sizeof(als_data));
-    if (!ret) {
-        return ret;
+    if (!ltr_303_als_read(ALS_DATA_ADDR, als_data, sizeof(als_data))) {
+        return false;
     }
     const uint8_t ch0 = als_data[1] | (als_data[2] << 8);
     const uint8_t ch1 = als_data[0] | (als_data[1] << 8);

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
+
+#define LTR303_MEASUREMENT_TIME_MS 120
 
 typedef enum {
     LTR303_GAIN_1X,
@@ -13,4 +14,5 @@ typedef enum {
 } ltr303_gain_t;
 
 bool ltr_303_als_init(int i2c_bus_id, ltr303_gain_t gain);
-bool ltr_303_als_measure(float *p_out);
+bool ltr_303_als_start_measurement(int *p_measurement_time_ms);
+bool ltr_303_als_read_measurement(float *p_out);
