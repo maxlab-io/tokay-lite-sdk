@@ -6,10 +6,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define LTR_303_ALS_ADDR 0x52
+#define LTR_303_ALS_ADDR 0x29
 
 #define PART_ID_ADDR 0x86
-#define LTR303_PART_ID 0xB1
+#define LTR303_PART_ID 0xA0
 
 #define ALS_MAIN_CTRL_ADDR 0x80
 #define ALS_MAIN_CTRL_DATA 0x01
