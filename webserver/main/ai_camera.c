@@ -371,12 +371,12 @@ void ai_camera_settings_apply_single_var(const cJSON *p_var)
 
 static void ir_cut_on(void)
 {
-    gpio_set_level(IRCUT_CTRL_PIN, 0);
+    gpio_set_level(IRCUT_CTRL_PIN, 1);
 }
 
 static void ir_cut_off(void)
 {
-    gpio_set_level(IRCUT_CTRL_PIN, 1);
+    gpio_set_level(IRCUT_CTRL_PIN, 0);
 }
 
 static void ir_leds_on(uint8_t duty)
