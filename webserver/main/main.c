@@ -159,7 +159,7 @@ static void app_task(void *pvArg)
         do {
             xQueueReceive(event_queue, &event, portMAX_DELAY);
         } while (APP_EVENT_WIFI_CONNECTED != event && xTaskGetTickCount() - start < pdMS_TO_TICKS(10000));
-        bool enable_pir_wakeup = false;
+        bool enable_pir_wakeup = true;
         const int sleep_duration_seconds = auto_mode_run(&enable_pir_wakeup);
         if (enable_pir_wakeup) {
             pir_enable();

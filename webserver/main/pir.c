@@ -36,7 +36,7 @@ bool pir_is_motion_detected(void)
 
 void pir_enable(void)
 {
-    gpio_set_level(PIR_CTRL_D_PIN, 1);
+    gpio_set_level(PIR_CTRL_D_PIN, 0);
     gpio_set_level(PIR_CTRL_LE_PIN, 1);
 
     gpio_set_level(PIR_CTRL_LE_PIN, 0);
@@ -45,7 +45,7 @@ void pir_enable(void)
 
 void pir_disable(void)
 {
-    gpio_set_level(PIR_CTRL_D_PIN, 0);
+    gpio_set_level(PIR_CTRL_D_PIN, 1);
     gpio_set_level(PIR_CTRL_LE_PIN, 1);
 
     gpio_set_level(PIR_CTRL_LE_PIN, 0);
