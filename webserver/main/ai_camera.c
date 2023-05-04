@@ -171,7 +171,6 @@ static struct {
     float light_sensor_value;
     ai_camera_ir_state_t ir_state;
     TimerHandle_t ir_mode_timer;
-    bool als_measurement_started;
     ai_camera_pipeline_t pipeline;
     ai_camera_frame_cb_t p_frame_cb;
     ai_camera_meta_cb_t p_meta_cb;
@@ -223,7 +222,6 @@ void ai_camera_init(int i2c_bus_id)
 
     camera_ctx.ir_mode_timer = xTimerCreate("ir_tmr", pdMS_TO_TICKS(IR_MODE_TIMER_PERIOD_MS),
                              pdFALSE, NULL, ir_mode_timer_handler);
-    camera_ctx.als_measurement_started = false;
 
     xTaskCreatePinnedToCore(camera_thread_entry, "AICAM", CAMERA_THREAD_STACK_SIZE,
             NULL, CAMERA_THREAD_PRIORITY, &camera_ctx.camera_thread, 0);
@@ -430,33 +428,30 @@ static void update_ir_mode(void)
         ai_camera_settings_get_value(AI_CAMERA_CONFIG_IR_LIGHT_THRESH_HIGH);
     const ai_camera_ir_mode_t ir_light_thresh_low =
         ai_camera_settings_get_value(AI_CAMERA_CONFIG_IR_LIGHT_THRESH_LOW);
-    TickType_t timer_period = pdMS_TO_TICKS(IR_MODE_TIMER_PERIOD_MS);
     if (AI_CAMERA_IR_MODE_AUTO == ir_mode) {
-        if (!camera_ctx.als_measurement_started) {
-            camera_ctx.als_measurement_started = true;
-            int measurement_duration = 0;
-            if (light_sensor_start_measurement(&measurement_duration)) {
-                timer_period = pdMS_TO_TICKS(measurement_duration);
-            } else {
-                ESP_LOGE(TAG, "Failed to start ALS measurement");
-            }
+        int measurement_delay_ms = 0;
+        if (light_sensor_start_measurement(&measurement_delay_ms)) {
+            vTaskDelay(pdMS_TO_TICKS(measurement_delay_ms));
         } else {
-            camera_ctx.als_measurement_started = false;
-            if (light_sensor_read_measurement(&camera_ctx.light_sensor_value)) {
-                if (camera_ctx.light_sensor_value > ir_light_thresh_high) {
-                    if (camera_ctx.ir_state != AI_CAMERA_IR_STATE_DAY) {
-                        ESP_LOGI(TAG, "Switching to day");
-                        ir_mode_day();
-                        camera_ctx.ir_state = AI_CAMERA_IR_STATE_DAY;
-                    }
-                } else if (camera_ctx.light_sensor_value < ir_light_thresh_low) {
-                    if (camera_ctx.ir_state != AI_CAMERA_IR_STATE_NIGHT) {
-                        ESP_LOGI(TAG, "Switching to night");
-                        ir_mode_night();
-                        camera_ctx.ir_state = AI_CAMERA_IR_STATE_NIGHT;
-                    }
+            ESP_LOGE(TAG, "Failed to start ALS measurement");
+        }
+        const bool success = light_sensor_read_measurement(&camera_ctx.light_sensor_value);
+        if (success) {
+            if (camera_ctx.light_sensor_value > ir_light_thresh_high) {
+                if (camera_ctx.ir_state != AI_CAMERA_IR_STATE_DAY) {
+                    ESP_LOGI(TAG, "Switching to day");
+                    ir_mode_day();
+                    camera_ctx.ir_state = AI_CAMERA_IR_STATE_DAY;
+                }
+            } else if (camera_ctx.light_sensor_value < ir_light_thresh_low) {
+                if (camera_ctx.ir_state != AI_CAMERA_IR_STATE_NIGHT) {
+                    ESP_LOGI(TAG, "Switching to night");
+                    ir_mode_night();
+                    camera_ctx.ir_state = AI_CAMERA_IR_STATE_NIGHT;
                 }
             }
+        } else {
+            ESP_LOGE(TAG, "Failed to read ALS measurement");
         }
     } else if (AI_CAMERA_IR_MODE_DAY == ir_mode) {
         if (AI_CAMERA_IR_STATE_DAY != camera_ctx.ir_state) {
@@ -470,7 +465,6 @@ static void update_ir_mode(void)
         }
     }
 
-    xTimerChangePeriod(camera_ctx.ir_mode_timer, timer_period, portMAX_DELAY);
     xTimerStart(camera_ctx.ir_mode_timer, portMAX_DELAY);
 }
 

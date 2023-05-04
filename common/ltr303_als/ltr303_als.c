@@ -171,24 +171,20 @@ static bool ltr_303_als_read(uint8_t addr, uint8_t *data, uint8_t len)
 
 static float get_visible_lux(uint16_t ch0, uint16_t ch1, int als_gain, int als_int)
 {
-    float ret; // variable to hold the computed ambient light value in Lux
-
     // Compute the ratio of ch1 to the sum of ch0 and ch1
     float ratio = (float)ch1 / (ch0 + ch1);
 
     // Compute the ret value based on the ratio and the LTR303-ALS01 sensor's gain and integration time values
     if (ratio < 0.45) {
-        ret = (1.7743 * ch0 + 1.1059 * ch1) / (als_gain * als_int);
+        return (1.7743 * ch0 + 1.1059 * ch1) / (als_gain * als_int);
     }
     else if (ratio >= 0.45 && ratio < 0.64) {
-        ret = (4.2785 * ch0 - 1.9548 * ch1) / (als_gain * als_int);
+        return (4.2785 * ch0 - 1.9548 * ch1) / (als_gain * als_int);
     }
     else if (ratio >= 0.64 && ratio < 0.85) {
-        ret = (0.5926 * ch0 + 0.1185 * ch1) / (als_gain * als_int);
+        return (0.5926 * ch0 + 0.1185 * ch1) / (als_gain * als_int);
     }
     else {
-        ret = 0;
+        return 0;
     }
-
-    return ret;
 }
