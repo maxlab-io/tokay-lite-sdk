@@ -124,7 +124,7 @@ static void app_task(void *pvArg)
 
     event_queue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(app_event_t));
 
-    network_init("ai-camera", wifi_connection_callback);
+    network_init("tokay-lite", wifi_connection_callback);
     auto_mode_init();
     integrations_init();
 

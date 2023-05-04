@@ -8,4 +8,4 @@ set(EXTRA_COMPONENT_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/../external/apds9306
   ${CMAKE_CURRENT_SOURCE_DIR}/../external/esp-protocols/components/mdns)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(ai-camera-demo)
+project(tokay-lite-webserver)
