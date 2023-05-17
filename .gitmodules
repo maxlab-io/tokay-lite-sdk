@@ -1,13 +1,13 @@
 [submodule "external/esp32-camera"]
-  path = external/esp32-camera
-  url = git@github.com:RostakaGmfun/esp32-camera.git
-  branch = gmfun
+	path = external/esp32-camera
+	url = https://github.com/RostakaGmfun/esp32-camera.git
+	branch = gmfun
 [submodule "external/tflite-micro-esp-examples"]
 	path = external/tflite-micro-esp-examples
-	url = git@github.com:espressif/tflite-micro-esp-examples.git
+	url = https://github.com/espressif/tflite-micro-esp-examples.git
 [submodule "external/esp-protocols"]
 	path = external/esp-protocols
-	url = git@github.com:espressif/esp-protocols.git
+	url = https://github.com/espressif/esp-protocols.git
 [submodule "external/apds9306/sensor-apds9306"]
 	path = external/apds9306/sensor-apds9306
-	url = git@github.com:sensidev/sensor-apds9306.git
+	url = https://github.com/sensidev/sensor-apds9306.git
