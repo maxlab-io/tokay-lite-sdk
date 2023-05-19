@@ -31,6 +31,8 @@
 
 #define TAG "app_httpd"
 
+#define INVALID_FD 0xFFFFFFFF
+
 typedef enum {
     HTTP_IMAGE_FORMAT_JPEG,
     HTTP_IMAGE_FORMAT_YUV422,
@@ -127,6 +129,7 @@ void app_httpd_start(bool wifi_setup)
     if (NULL == app_httpd_ctx.telemetry_timer) {
         app_httpd_ctx.telemetry_timer = xTimerCreate("TELEMETRY", pdMS_TO_TICKS(TELEMETRY_UPDATE_PERIOD_MS),
                              pdFALSE, NULL, telemetry_timer_cb);
+        vTimerSetTimerID(app_httpd_ctx.telemetry_timer, (void *)INVALID_FD);
     }
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
@@ -163,6 +166,11 @@ void app_httpd_stop(void)
 bool app_httpd_is_running(void)
 {
     return app_httpd_ctx.is_running;
+}
+
+void app_httpd_trigger_telemetry_update(void)
+{
+    telemetry_timer_cb(app_httpd_ctx.telemetry_timer);
 }
 
 static esp_err_t http_handler_get_static_page(httpd_req_t *req)
@@ -355,6 +363,9 @@ static void telemetry_timer_cb(TimerHandle_t handle)
 static void send_telemetry(void *arg)
 {
     const int fd = (int)arg;
+    if (INVALID_FD == fd) {
+        return;
+    }
     vTimerSetTimerID(app_httpd_ctx.telemetry_timer, (void *)arg);
     xTimerReset(app_httpd_ctx.telemetry_timer, portMAX_DELAY);
 
@@ -366,7 +377,7 @@ static void send_telemetry(void *arg)
     bsp_temp_sensor_read(&tsens_value);
 
     cJSON_AddNumberToObject(p_root, "light", ai_camera_get_light_level());
-    cJSON_AddNumberToObject(p_root, "motion", 0); // TODO: figure out how to report motion
+    cJSON_AddNumberToObject(p_root, "motion", app_is_motion_active());
     cJSON_AddNumberToObject(p_root, "ir", ai_camera_get_ir_state());
     cJSON_AddNumberToObject(p_root, "temp", (int)tsens_value);
     cJSON_AddNumberToObject(p_root, "vbat", bsp_read_vbat());

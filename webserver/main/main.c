@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/timers.h"
 
 #include "nvs_flash.h"
 #include "esp_log.h"
@@ -30,14 +31,19 @@
 #define APP_TASK_STACK_SIZE 4096
 #define APP_TASK_PRIORITY   5
 
+#define MOTION_COOLDOWN_TIME_MS 5000
+
 static QueueHandle_t event_queue;
 static cJSON *p_system_settings;
+static TimerHandle_t motion_cooldown_timer;
+static bool motion_active;
 
 static void pir_motion_callback(void *ctx);
 static void wifi_connection_callback(void);
 static void button_callback(void);
 static void app_task(void *pvArg);
 static cJSON *system_settings_make_default(void);
+static void motion_cooldown_timer_cb(TimerHandle_t handle);
 
 void app_main(void)
 {
@@ -101,6 +107,11 @@ void app_send_event_from_isr(app_event_t ev)
     BaseType_t xRet = xQueueSendFromISR(event_queue, &ev, &wakeup_needed);
     configASSERT(pdTRUE == xRet);
     portYIELD_FROM_ISR(wakeup_needed);
+}
+
+bool app_is_motion_active(void)
+{
+    return motion_active;
 }
 
 static void pir_motion_callback(void *ctx)
@@ -177,6 +188,9 @@ static void app_task(void *pvArg)
         }
     }
 
+    motion_cooldown_timer = xTimerCreate("MOTION_CD", pdMS_TO_TICKS(MOTION_COOLDOWN_TIME_MS),
+                             pdFALSE, NULL, motion_cooldown_timer_cb);
+
     while (1) {
         app_event_t event = APP_EVENT_MAX;
         xQueueReceive(event_queue, &event, portMAX_DELAY);
@@ -187,6 +201,13 @@ static void app_task(void *pvArg)
             }
             break;
         case APP_EVENT_PIR_MOTION_DETECTED:
+            xTimerReset(motion_cooldown_timer, portMAX_DELAY);
+            if (!motion_active) {
+                motion_active = true;
+                if (app_httpd_is_running()) {
+                    app_httpd_trigger_telemetry_update();
+                }
+            }
             ESP_LOGI(TAG, "Motion detected");
             break;
         case APP_EVENT_BUTTON_PRESSED:
@@ -225,4 +246,9 @@ static cJSON *system_settings_make_default(void)
 {
     const char *p_default_json = "{\"wifi_ssid\":\"\",\"wifi_password\":\"\"}";
     return cJSON_ParseWithLength(p_default_json, strlen(p_default_json));
+}
+
+static void motion_cooldown_timer_cb(TimerHandle_t handle)
+{
+    motion_active = false;
 }

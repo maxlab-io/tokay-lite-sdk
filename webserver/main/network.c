@@ -29,7 +29,7 @@ void network_init(const char *name, network_sta_connected_cb_t connected_cb)
     sta_netif = esp_netif_create_default_wifi_sta();
     ESP_ERROR_CHECK(esp_netif_set_hostname(sta_netif, name));
     ap_netif = esp_netif_create_default_wifi_ap();
-    ESP_ERROR_CHECK(esp_netif_set_hostname(sta_netif, name));
+    ESP_ERROR_CHECK(esp_netif_set_hostname(ap_netif, name));
     esp_netif_ip_info_t info_t;
     start_mdns(name);
     memset(&info_t, 0, sizeof(esp_netif_ip_info_t));

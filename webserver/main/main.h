@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 #include "cJSON.h"
 
 typedef enum {
@@ -23,3 +25,4 @@ const cJSON *system_settings_get_json(void);
 void system_settings_apply(void);
 
 void app_send_event(app_event_t ev);
+bool app_is_motion_active(void);
