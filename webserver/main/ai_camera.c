@@ -482,7 +482,8 @@ static void camera_thread_entry(void *pvParam)
     set_sensor_settings();
     ai_pipeline_init();
     cJSON *p_meta_root = cJSON_CreateObject();
-    cJSON_AddItemToObject(p_meta_root, "cnn_output", ai_pipeline_get_results());
+    cJSON *p_cnn_output = ai_pipeline_create_results_object();
+    cJSON_AddItemToObject(p_meta_root, "cnn_output", p_cnn_output);
     cJSON *p_stats_fps = cJSON_AddNumberToObject(p_meta_root, "fps", 0);
     int64_t total_frame_time_us = 0;
     uint32_t total_frames = 0;
@@ -507,18 +508,12 @@ static void camera_thread_entry(void *pvParam)
         const ai_camera_pipeline_t current_pipeline = camera_ctx.pipeline;
         if (AI_CAMERA_PIPELINE_DISCARD != current_pipeline) {
             if (AI_CAMERA_PIPELINE_CNN == current_pipeline) {
-                ai_pipeline_start(p_frame->buf, p_frame->len);
+                ai_pipeline_submit(p_frame->buf, p_frame->len);
             }
             if (NULL != camera_ctx.p_frame_cb) {
                 camera_ctx.p_frame_cb(p_frame->format, p_frame->buf, p_frame->len, camera_ctx.p_cb_ctx);
             }
-            if (AI_CAMERA_PIPELINE_CNN == current_pipeline) {
-                ai_pipeline_wait_decode_finish(pdMS_TO_TICKS(600));
-            }
             esp_camera_fb_return(p_frame);
-            if (AI_CAMERA_PIPELINE_CNN == current_pipeline) {
-                ai_pipeline_wait(portMAX_DELAY);
-            }
         } else {
             esp_camera_fb_return(p_frame);
         }
@@ -527,6 +522,7 @@ static void camera_thread_entry(void *pvParam)
         total_frames++;
         if (NULL != camera_ctx.p_meta_cb) {
             p_stats_fps->valuedouble = (total_frames * 1000000.f) / total_frame_time_us;
+            ai_pipeline_fill_results_object(p_cnn_output); // Get the latest values
             camera_ctx.p_meta_cb(p_meta_root, camera_ctx.p_cb_ctx);
         }
         if (total_frames % 5 == 0) {
