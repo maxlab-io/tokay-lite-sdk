@@ -965,8 +965,6 @@
             ctx.font = "20px monospace";
 
             $('#fpsVal').text(stream_metadata['fps'].toFixed(2));
-            $('#confidenceVal').text(stream_metadata['cnn_output']);
-            $('#fpsVal').text(stream_metadata['fps'].toFixed(2));
             $('#confidenceVal').text(stream_metadata['cnn_output']['person_score'].toFixed(2));
 
           }

@@ -21,20 +21,16 @@
 #define TFLITE_TASK_STACK_SIZE 4096
 #define TFLITE_TASK_PRIORITY   10
 
+#define INPUT_MAX_SIZE 128 * 1024
+
 static constexpr int kTensorArenaSize = 128 * 1024;
 static const tflite::Model* model;
 static tflite::MicroInterpreter* interpreter;
 static uint8_t *tensor_arena;
 
 static TaskHandle_t tflite_task_handle;
-static SemaphoreHandle_t tflite_done_sem;
-static SemaphoreHandle_t decode_done_sem;
-static const uint8_t *p_input;
+static uint8_t *p_input;
 static size_t input_size;
-
-static cJSON *p_results_root;
-static cJSON *p_results_person_score;
-static cJSON *p_results_no_person_score;
 
 // Keeping these as constant expressions allow us to allocate fixed-sized arrays
 // on the stack for our working memory.
@@ -50,6 +46,10 @@ constexpr int kMaxImageSize = kNumCols * kNumRows * kNumChannels;
 constexpr int kCategoryCount = 2;
 constexpr int kPersonIndex = 1;
 constexpr int kNotAPersonIndex = 0;
+
+static float person_score_f;
+
+static bool pipeline_busy;
 
 typedef struct decode_ctx_t {
     const uint8_t *in_buf;
@@ -73,6 +73,12 @@ void ai_pipeline_init(void)
     tensor_arena = (uint8_t *) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
     if (tensor_arena == NULL) {
         ESP_LOGE(TAG, "Couldn't allocate memory of %d bytes\n", kTensorArenaSize);
+        return;
+    }
+
+    p_input = (uint8_t *) heap_caps_malloc(INPUT_MAX_SIZE, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+    if (p_input == NULL) {
+        ESP_LOGE(TAG, "Couldn't allocate memory of %d bytes\n", INPUT_MAX_SIZE);
         return;
     }
 
@@ -111,43 +117,44 @@ void ai_pipeline_init(void)
         return;
     }
 
-    p_results_root = cJSON_CreateObject();
-    p_results_person_score = cJSON_AddNumberToObject(p_results_root, "person_score", 0);
-    p_results_no_person_score = cJSON_AddNumberToObject(p_results_root, "no_person_score", 1);
-
-    tflite_done_sem = xSemaphoreCreateBinary();
-    decode_done_sem = xSemaphoreCreateBinary();
     xTaskCreatePinnedToCore(tflite_task_entry, "TFLITE", TFLITE_TASK_STACK_SIZE,
                             NULL, TFLITE_TASK_PRIORITY, &tflite_task_handle, 1);
     configASSERT(&tflite_task_handle);
 }
 
-void ai_pipeline_start(const uint8_t *p_frame_data, uint32_t size)
+void ai_pipeline_submit(const uint8_t *p_frame_data, uint32_t size)
 {
     // Run the model on this input and make sure it succeeds.
-    p_input = p_frame_data;
+    if (size > INPUT_MAX_SIZE) {
+        ESP_LOGE(TAG, "Input size too big: %lu, dropping", size);
+        return;
+    }
+    if (pipeline_busy) {
+        return;
+    }
+    pipeline_busy = true;
+    memcpy(p_input, p_frame_data, size);
     input_size = size;
     xTaskNotify(tflite_task_handle, 0, eNoAction);
 }
 
-void ai_pipeline_wait_decode_finish(TickType_t timeous_ticks)
+cJSON *ai_pipeline_create_results_object(void)
 {
-    xSemaphoreTake(decode_done_sem, portMAX_DELAY);
-}
-
-void ai_pipeline_wait(TickType_t timeous_ticks)
-{
-    xSemaphoreTake(tflite_done_sem, portMAX_DELAY);
-}
-
-cJSON *ai_pipeline_get_results(void)
-{
+    cJSON *p_results_root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(p_results_root, "person_score", 0);
     return p_results_root;
+}
+
+void ai_pipeline_fill_results_object(cJSON *p_obj)
+{
+    cJSON *p_person_score = cJSON_GetObjectItem(p_obj, "person_score");
+    p_person_score->valuedouble = person_score_f;
 }
 
 void ai_pipeline_deinit(void)
 {
-    // TODO
+    free(p_input);
+    free(tensor_arena);
 }
 
 #ifdef __cplusplus
@@ -218,7 +225,6 @@ static void tflite_task_entry(void *)
         TfLiteTensor *input = interpreter->input(0);
 
         jpeg_decode(p_input, input_size, input->data.uint8);
-        xSemaphoreGive(decode_done_sem);
 
         if (kTfLiteOk != interpreter->Invoke()) {
             ESP_LOGE(TAG, "Invoke failed");
@@ -227,12 +233,7 @@ static void tflite_task_entry(void *)
         int8_t person_score = output->data.uint8[kPersonIndex];
         int8_t no_person_score = output->data.uint8[kNotAPersonIndex];
 
-        const float person_score_f =
-            (person_score - output->params.zero_point) * output->params.scale;
-        const float no_person_score_f =
-            (no_person_score - output->params.zero_point) * output->params.scale;
-        p_results_person_score->valuedouble = person_score_f;
-        p_results_no_person_score->valuedouble = no_person_score_f;
-        xSemaphoreGive(tflite_done_sem);
+        person_score_f = (person_score - output->params.zero_point) * output->params.scale;
+        pipeline_busy = false;
     }
 }

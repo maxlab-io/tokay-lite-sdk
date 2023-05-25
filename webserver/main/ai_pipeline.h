@@ -11,10 +11,9 @@ extern "C" {
 #endif
 
 void ai_pipeline_init(void);
-void ai_pipeline_start(const uint8_t *p_frame_data, uint32_t size);
-void ai_pipeline_wait(TickType_t timeous_ticks);
-void ai_pipeline_wait_decode_finish(TickType_t timeous_ticks);
-cJSON *ai_pipeline_get_results(void);
+void ai_pipeline_submit(const uint8_t *p_frame_data, uint32_t size);
+cJSON *ai_pipeline_create_results_object(void);
+void ai_pipeline_fill_results_object(cJSON *p_obj);
 void ai_pipeline_finish(void);
 
 #ifdef __cplusplus
