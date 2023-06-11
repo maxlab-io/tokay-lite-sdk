@@ -459,7 +459,7 @@
                           </div>
                         </div>
                       </div>
-                      <!-- / edge impulse tab -->
+                      <!-- / home assistant tab -->
 
                       <!-- edge impulse tab -->
                       <div class="tab-pane fade" id="tab-edge-impulse" role="tabpanel">
@@ -481,11 +481,24 @@
                       </div>
                       <!-- / dropbox tab -->
 
-                      <!-- dropbox tab -->
+                      <!-- thingsboard tab -->
                       <div class="tab-pane fade" id="tab-thingsboard" role="tabpanel">
-                        <div class="card">
-                          <h5 class="card-header">ThingsBoard</h5>
-                          <div class="card-body">
+                        <div class="col">
+                          <div class="row-md mb-2">
+                            <div class="card" id="thingsboardSettingsCard">
+                              <h5 class="card-header">ThingsBoard</h5>
+                              <div class="card-body pb-2">
+                                <form id="thingsboardSettingsForm">
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="row-md mb-0">
+                            <div class="card overflow-hidden">
+                              <div class="card-body">
+                                <button type="submit" form="thingsboardSettingsForm" class="btn btn-primary w-100">Save</button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -936,6 +949,24 @@
         }
     };
 
+    const thinsboardSettingsSchema = {
+        host: {
+            type: 'text',
+            title: 'Host',
+            default: 'demo.thingsboard.io',
+        },
+        auth_key: {
+            type: 'text',
+            title: 'Device Authentication Key',
+            default: '',
+        }
+        persistent_connection: {
+            type: 'checkbox',
+            title: 'Enable persistent MQTT connection',
+            default: true,
+        }
+    };
+
     function handlePlayStream() {
       var stream_metadata = null;
       let socket = new WebSocket("ws://" + location.host + "/stream");
@@ -1274,6 +1305,22 @@
         fetchSettings('integrations', function(resp) {
             if ('home_assistant' in resp) {
                 updateFormValues('homeAssistantSettingsForm', homeAssistantSettingsSchema, resp['home_assistant']);
+            }
+        });
+
+        const postHASettings = function(formData) {
+            const message = {
+                "thingsboard": formData
+            };
+            getSettingsSubmitCb('settings/integrations')(message);
+        };
+        generateSettingsForm(thingsboardSettingsSchema, 'thingsboardSettingsForm', null,
+                             '', postHASettings);
+        $('#thingsboardSettingsCard').attr('style', 'max-height:710px;');
+        new PerfectScrollbar('#thingsboardSettingsCard');
+        fetchSettings('integrations', function(resp) {
+            if ('thingsboard' in resp) {
+                updateFormValues('thingsboardSettingsForm', thingsboardSettingsSchema, resp['thingsboard']);
             }
         });
 

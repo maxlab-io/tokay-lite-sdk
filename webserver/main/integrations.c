@@ -66,6 +66,8 @@ bool integrations_run(integration_t integration, const void *p_buf, size_t len)
     switch (integration) {
     case INTEGRATION_HOME_ASSISTANT:
         return home_assistant_upload_picture(p_cfg, p_buf, len);
+    case INTEGRATION_THINGSBOARD:
+        return thingsboard_run(p_cfg, p_buf, len);
     default:
         return false;
     }
