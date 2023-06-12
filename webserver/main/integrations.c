@@ -4,6 +4,7 @@
 #include "esp_log.h"
 
 #include "json_settings_helpers.h"
+#include "thingsboard.h"
 
 #define HA_HTTP_TIMEOUT_MS 3000
 #define TAG "integrations"
@@ -67,7 +68,7 @@ bool integrations_run(integration_t integration, const void *p_buf, size_t len)
     case INTEGRATION_HOME_ASSISTANT:
         return home_assistant_upload_picture(p_cfg, p_buf, len);
     case INTEGRATION_THINGSBOARD:
-        return thingsboard_run(p_cfg, p_buf, len);
+        return thingsboard_upload_picture(p_cfg, p_buf, len);
     default:
         return false;
     }
