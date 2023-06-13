@@ -31,11 +31,9 @@ static void mqtt_event_handler_cb(void *handler_args, esp_event_base_t base, int
 {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
     int msg_id;
-    // Handle MQTT events here
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            // Once connected, subscribe to the attributes topic
             msg_id = esp_mqtt_client_subscribe(client_handle, "v1/devices/me/attributes", 0);
             ESP_LOGI(TAG, "Subscribed to topic v1/devices/me/attributes, msg_id=%d", msg_id);
             break;
@@ -47,7 +45,6 @@ static void mqtt_event_handler_cb(void *handler_args, esp_event_base_t base, int
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            // Handle incoming MQTT data here
             app_httpd_post_task(tb_take_image, NULL);
             break;
         default:

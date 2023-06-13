@@ -175,7 +175,9 @@ void app_httpd_trigger_telemetry_update(void)
 
 void app_httpd_post_task(void (*p_task)(void *p_ctx), void *p_ctx)
 {
-    httpd_queue_work(app_httpd_ctx.http_server_handle, p_task, p_ctx);
+    if (app_httpd_ctx.is_running) {
+        httpd_queue_work(app_httpd_ctx.http_server_handle, p_task, p_ctx);
+    }
 }
 
 static esp_err_t http_handler_get_static_page(httpd_req_t *req)

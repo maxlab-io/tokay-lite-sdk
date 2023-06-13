@@ -159,6 +159,9 @@ static void app_task(void *pvArg)
     const bool is_timer_triggered = bsp_get_timer_alarm();
 
     const bool enter_auto_mode = (is_pir_triggered || is_timer_triggered) && auto_mode_enabled();
+    const bool low_power_mode = auto_mode_low_power_enabled();
+    const bool pir_wakeup_enabled = auto_mode_pir_wakeup_enabled();
+    const int wakeup_period_seconds = auto_mode_get_wakeup_period_seconds();
 
     ai_camera_init(BSP_I2C_BUS_ID);
 
@@ -177,14 +180,16 @@ static void app_task(void *pvArg)
         } else {
             pir_disable();
         }
-        if (0 == sleep_duration_seconds) {
-            bsp_deep_sleep(UINT32_MAX);
-        } else {
-            bsp_deep_sleep(sleep_duration_seconds);
-        }
+        if (low_power_mode) {
+            if (0 == sleep_duration_seconds) {
+                bsp_deep_sleep(UINT32_MAX);
+            } else {
+                bsp_deep_sleep(sleep_duration_seconds);
+            }
 
-        while (1) {
-            vTaskDelay(100);
+            while (1) {
+                vTaskDelay(100);
+            }
         }
     }
 

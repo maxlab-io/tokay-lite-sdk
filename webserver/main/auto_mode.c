@@ -21,6 +21,7 @@ static cJSON *auto_mode_settings_get_default(void);
 
 static const char *config_names[AUTO_MODE_CONFIG_MAX] = {
     [AUTO_MODE_CONFIG_ENABLED] = "auto_mode_enabled",
+    [AUTO_MODE_CONFIG_LOW_POWER_ENABLED] = "low_power_enabled",
     [AUTO_MODE_CONFIG_PIR_ENABLED] = "pir_wakeup_enabled",
     [AUTO_MODE_CONFIG_TFLITE_TRIGGER_ENABLED] = "tflite_trigger_enabled",
     [AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED] = "rtc_wakeup_enabled",
@@ -49,6 +50,11 @@ void auto_mode_init(void)
 bool auto_mode_enabled(void)
 {
     return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_ENABLED])->valueint;
+}
+
+bool auto_mode_low_power_enabled(void)
+{
+    return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_LOW_POWER_ENABLED])->valueint;
 }
 
 typedef struct {
@@ -105,11 +111,7 @@ int auto_mode_run(bool *p_enable_pir_wakeup)
     heap_caps_free(psram_buf);
     vSemaphoreDelete(frame_ctx.done_sem);
     *p_enable_pir_wakeup = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_PIR_ENABLED])->valueint;
-    if (cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED])->valueint) {
-        return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_WAKEUP_PERIOD_SECONDS])->valueint;
-    } else {
-        return 0;
-    }
+    return json_settings_get_int_or(p_settings, config_names[AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED], 0);
 }
 
 void auto_mode_settings_set_json(const cJSON *p_cfg)

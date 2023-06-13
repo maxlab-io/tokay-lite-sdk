@@ -5,6 +5,7 @@
 
 typedef enum {
     AUTO_MODE_CONFIG_ENABLED,
+    AUTO_MODE_CONFIG_LOW_POWER_ENABLED,
     AUTO_MODE_CONFIG_PIR_ENABLED,
     AUTO_MODE_CONFIG_TFLITE_TRIGGER_ENABLED,
     AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED,
@@ -17,10 +18,14 @@ void auto_mode_init(void);
 
 bool auto_mode_enabled(void);
 
+bool auto_mode_low_power_enabled(void);
+bool auto_mode_pir_wakeup_enabled(void);
+int auto_mode_get_wakeup_period_seconds(void);
+
 /**
  * Run the automation and return number of seconds to sleep
  */
-int auto_mode_run(bool *p_enable_pir_wakeup);
+int auto_mode_run(void);
 
 void auto_mode_settings_set_json(const cJSON *p_settings);
 const cJSON *auto_mode_settings_get_json(void);
