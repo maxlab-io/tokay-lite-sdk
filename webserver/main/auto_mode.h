@@ -25,7 +25,7 @@ int auto_mode_get_wakeup_period_seconds(void);
 /**
  * Run the automation and return number of seconds to sleep
  */
-int auto_mode_run(void);
+bool auto_mode_run(void);
 
 void auto_mode_settings_set_json(const cJSON *p_settings);
 const cJSON *auto_mode_settings_get_json(void);

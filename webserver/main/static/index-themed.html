@@ -954,17 +954,17 @@
         }
     };
 
-    const thinsboardSettingsSchema = {
-        host: {
+    const thingsboardSettingsSchema = {
+        uri: {
             type: 'text',
-            title: 'Host',
-            default: 'demo.thingsboard.io',
+            title: 'MQTT URI',
+            default: 'mqtt://demo.thingsboard.io:1883',
         },
         auth_key: {
             type: 'text',
             title: 'Device Authentication Key',
             default: '',
-        }
+        },
         persistent_connection: {
             type: 'checkbox',
             title: 'Enable persistent MQTT connection',
@@ -1307,23 +1307,22 @@
                              '', postHASettings);
         $('#homeAssistantSettingsCard').attr('style', 'max-height:710px;');
         new PerfectScrollbar('#homeAssistantSettingsCard');
-        fetchSettings('integrations', function(resp) {
-            if ('home_assistant' in resp) {
-                updateFormValues('homeAssistantSettingsForm', homeAssistantSettingsSchema, resp['home_assistant']);
-            }
-        });
 
-        const postHASettings = function(formData) {
+        const postTBSettings = function(formData) {
             const message = {
                 "thingsboard": formData
             };
             getSettingsSubmitCb('settings/integrations')(message);
         };
         generateSettingsForm(thingsboardSettingsSchema, 'thingsboardSettingsForm', null,
-                             '', postHASettings);
+                             '', postTBSettings);
         $('#thingsboardSettingsCard').attr('style', 'max-height:710px;');
         new PerfectScrollbar('#thingsboardSettingsCard');
+
         fetchSettings('integrations', function(resp) {
+            if ('home_assistant' in resp) {
+                updateFormValues('homeAssistantSettingsForm', homeAssistantSettingsSchema, resp['home_assistant']);
+            }
             if ('thingsboard' in resp) {
                 updateFormValues('thingsboardSettingsForm', thingsboardSettingsSchema, resp['thingsboard']);
             }

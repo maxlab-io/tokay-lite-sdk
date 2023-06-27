@@ -49,12 +49,26 @@ void auto_mode_init(void)
 
 bool auto_mode_enabled(void)
 {
-    return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_ENABLED])->valueint;
+    return json_settings_get_int_or(p_settings, config_names[AUTO_MODE_CONFIG_ENABLED], 0);
 }
 
 bool auto_mode_low_power_enabled(void)
 {
-    return cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_LOW_POWER_ENABLED])->valueint;
+    return json_settings_get_int_or(p_settings, config_names[AUTO_MODE_CONFIG_LOW_POWER_ENABLED], 0);
+}
+
+bool auto_mode_pir_wakeup_enabled(void)
+{
+    return json_settings_get_int_or(p_settings, config_names[AUTO_MODE_CONFIG_PIR_ENABLED], 0);
+}
+
+int auto_mode_get_wakeup_period_seconds(void)
+{
+    if (json_settings_get_int_or(p_settings, config_names[AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED], 0)) {
+        return json_settings_get_int_or(p_settings, config_names[AUTO_MODE_CONFIG_WAKEUP_PERIOD_SECONDS], 0);
+    } else {
+        return 0;
+    }
 }
 
 typedef struct {
@@ -80,7 +94,7 @@ static void frame_cb(pixformat_t format, const uint8_t *p_buf, uint32_t len, voi
     }
 }
 
-int auto_mode_run(bool *p_enable_pir_wakeup)
+bool auto_mode_run(void)
 {
     void *psram_buf = heap_caps_malloc(1024 * 1024 * 4, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
     void *bufs[NUM_FRAMES_TO_UPLOAD] = { 0 };
@@ -98,9 +112,11 @@ int auto_mode_run(bool *p_enable_pir_wakeup)
     ai_camera_stop();
 
     const cJSON *p_integration_id = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_INTEGRATION_ID]);
+    bool ret = true;
     if (NULL != p_integration_id) {
         for (int i = 0; i < NUM_FRAMES_TO_UPLOAD; i++) {
             if (!integrations_run(p_integration_id->valueint, bufs[i], lens[i])) {
+                ret = false;
                 break;
             }
         }
@@ -110,8 +126,7 @@ int auto_mode_run(bool *p_enable_pir_wakeup)
 
     heap_caps_free(psram_buf);
     vSemaphoreDelete(frame_ctx.done_sem);
-    *p_enable_pir_wakeup = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_PIR_ENABLED])->valueint;
-    return json_settings_get_int_or(p_settings, config_names[AUTO_MODE_CONFIG_RTC_WAKEUP_ENABLED], 0);
+    return ret;
 }
 
 void auto_mode_settings_set_json(const cJSON *p_cfg)

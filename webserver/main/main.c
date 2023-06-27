@@ -15,6 +15,7 @@
 
 #include "nvs_flash.h"
 #include "esp_log.h"
+#include "esp_system.h"
 
 #include "bsp.h"
 #include "pir.h"
@@ -161,7 +162,7 @@ static void app_task(void *pvArg)
     const bool enter_auto_mode = (is_pir_triggered || is_timer_triggered) && auto_mode_enabled();
     const bool low_power_mode = auto_mode_low_power_enabled();
     const bool pir_wakeup_enabled = auto_mode_pir_wakeup_enabled();
-    const int wakeup_period_seconds = auto_mode_get_wakeup_period_seconds();
+    const int sleep_duration_seconds = auto_mode_get_wakeup_period_seconds();
 
     ai_camera_init(BSP_I2C_BUS_ID);
 
@@ -173,24 +174,28 @@ static void app_task(void *pvArg)
         do {
             xQueueReceive(event_queue, &event, portMAX_DELAY);
         } while (APP_EVENT_WIFI_CONNECTED != event && xTaskGetTickCount() - start < pdMS_TO_TICKS(10000));
-        bool enable_pir_wakeup = true;
-        const int sleep_duration_seconds = auto_mode_run(&enable_pir_wakeup);
-        if (enable_pir_wakeup) {
+        if (!auto_mode_run()) {
+            ESP_LOGE(TAG, "Failed to run auto mode integrations");
+        }
+        ESP_LOGI(TAG, "Auto mode done %d %d", pir_wakeup_enabled, low_power_mode);
+        if (pir_wakeup_enabled) {
             pir_enable();
         } else {
             pir_disable();
         }
+        /*
         if (low_power_mode) {
+            ESP_LOGI(TAG, "Entering deep sleep");
             if (0 == sleep_duration_seconds) {
                 bsp_deep_sleep(UINT32_MAX);
             } else {
                 bsp_deep_sleep(sleep_duration_seconds);
             }
 
-            while (1) {
-                vTaskDelay(100);
-            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            esp_restart();
         }
+        */
     }
 
     motion_cooldown_timer = xTimerCreate("MOTION_CD", pdMS_TO_TICKS(MOTION_COOLDOWN_TIME_MS),

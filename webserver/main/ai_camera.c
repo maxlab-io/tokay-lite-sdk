@@ -488,8 +488,9 @@ static void camera_thread_entry(void *pvParam)
     int64_t total_frame_time_us = 0;
     uint32_t total_frames = 0;
     while (1) {
-        const uint32_t commands = xEventGroupWaitBits(camera_ctx.camera_thread_commands,
-                (1 << CAMERA_CMD_STOP), pdTRUE, pdTRUE, 0);
+        const uint32_t bits_to_wait = (1 << CAMERA_CMD_STOP) | (1 << CAMERA_CMD_START) | (1 << CAMERA_CMD_READ_LIGHT_SENSOR);
+        const uint32_t commands = xEventGroupWaitBits(camera_ctx.camera_thread_commands, bits_to_wait,
+                                                      pdTRUE, pdFALSE, 0);
         if (commands & (1 << CAMERA_CMD_STOP)) {
             ESP_LOGI(TAG, "Stopping camera thread");
             camera_thread_sleep();
