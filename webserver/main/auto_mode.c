@@ -107,18 +107,22 @@ bool auto_mode_run(void)
         .p_psram_iter = psram_buf,
         .done_sem = xSemaphoreCreateBinary(),
     };
-    ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, frame_cb, NULL, &frame_ctx);
-    xSemaphoreTake(frame_ctx.done_sem, portMAX_DELAY);
+    ai_camera_start(AI_CAMERA_PIPELINE_PASSTHROUGH, NULL, NULL, NULL);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    camera_fb_t *p_frame = ai_camera_get_frame(PIXFORMAT_JPEG, pdMS_TO_TICKS(1000));
+    if (NULL == p_frame) {
+        ESP_LOGE(TAG, "Failed to get camera frame");
+    } else {
+        frame_cb(p_frame->format, p_frame->buf, p_frame->len, &frame_ctx);
+    }
+    ai_camera_fb_return(p_frame);
     ai_camera_stop();
 
     const cJSON *p_integration_id = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_INTEGRATION_ID]);
     bool ret = true;
     if (NULL != p_integration_id) {
-        for (int i = 0; i < NUM_FRAMES_TO_UPLOAD; i++) {
-            if (!integrations_run(p_integration_id->valueint, bufs[i], lens[i])) {
-                ret = false;
-                break;
-            }
+        if (!integrations_run(p_integration_id->valueint, bufs[0], lens[0])) {
+            ret = false;
         }
     } else {
         ESP_LOGE(TAG, "No integration assigned");

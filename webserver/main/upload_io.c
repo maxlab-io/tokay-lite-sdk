@@ -44,8 +44,23 @@ bool upload_io_upload_picture(const cJSON *p_cfg, const void *p_buf, size_t len)
         ESP_LOGE(TAG, "API key for upload.io required");
         return false;
     }
+    const char *p_account_id = json_settings_get_string_or(p_cfg, "account_id", NULL);
+    if (NULL == p_account_id) {
+        ESP_LOGE(TAG, "Account ID for upload.io required");
+        return false;
+    }
+    uint8_t mac[6] = { 0 };
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    char date_time_str[64];
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    strftime(date_time_str, sizeof(date_time_str), "%Y-%m-%d-%H-%M-%S", tm);
+    const char *p_base_name = json_settings_get_string_or(p_cfg, "base_name", "");
+    char url_str[256];
+    snprintf(url_str, sizeof(url_str), "https://api.upload.io/v2/accounts/%s/uploads/binary?fileName=%s_%02x%02x%02x%02x%02x%02x_%s.jpeg",
+             p_account_id, p_base_name, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], date_time_str);
     esp_http_client_config_t config = {
-        .url = "https://api.upload.io/v1/files/basic",
+        .url = url_str,
         .disable_auto_redirect = true,
         .cert_pem = upload_io_server_certificate,
         .timeout_ms = UPLOAD_IO_TIMEOUT_MS,
@@ -55,21 +70,10 @@ bool upload_io_upload_picture(const cJSON *p_cfg, const void *p_buf, size_t len)
         ESP_LOGE(TAG, "Failed to create HTTP client");
         return false;
     }
-    uint8_t mac[6] = { 0 };
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    char upload_tags[128];
-    char date_time_str[64];
-    time_t t = time(NULL);
-    struct tm *tm = localtime(&t);
-    strftime(date_time_str, sizeof(date_time_str), "%Y-%m-%d-%H-%M-%S", tm);
-    const char *p_base_name = json_settings_get_string_or(p_cfg, "base_name", "");
-    snprintf(upload_tags, sizeof(upload_tags), "[{\"name\":\"%s_%02x%02x%02x%02x%02x%02x_%s\",\"searchable\":true}]",
-             p_base_name, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], date_time_str);
     char auth[128];
     snprintf(auth, sizeof(auth), "Bearer %s", p_api_key);
     esp_http_client_set_method(http_client, HTTP_METHOD_POST);
     esp_http_client_set_header(http_client, "Content-Type", "image/jpeg");
-    esp_http_client_set_header(http_client, "X-Upload-Tags", upload_tags);
     esp_http_client_set_header(http_client, "Authorization", auth);
     int ret = esp_http_client_open(http_client, len);
     if (0 != ret) {
@@ -92,13 +96,14 @@ bool upload_io_upload_picture(const cJSON *p_cfg, const void *p_buf, size_t len)
         const int ret = esp_http_client_read_response(http_client, buf, content_len);
         if (ret != content_len) {
             ESP_LOGE(TAG, "Failed to read HTTP response %d", ret);
+            free(buf);
+            esp_http_client_cleanup(http_client);
+            return false;
         } else {
             buf[content_len] = 0;
             ESP_LOGI(TAG, "%s", buf);
         }
         free(buf);
-        esp_http_client_cleanup(http_client);
-        return false;
     }
     esp_http_client_cleanup(http_client);
     return true;
