@@ -171,6 +171,14 @@
             </a>
           </li>
 
+          <!-- Upload.io -->
+          <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-upload-io">
+            <a href="javascript:void(0);" class="menu-link">
+              <i class="menu-icon tf-icons bx bx-link-alt"></i>
+              <div>Upload.io</div>
+            </a>
+          </li>
+
           <!-- Plain HTTP -->
           <li class="menu-item nav-link" data-bs-toggle="tab" data-bs-target="#tab-http">
             <a href="javascript:void(0);" class="menu-link">
@@ -513,6 +521,30 @@
                         </div>
                       </div>
                       <!-- / AWS s3 tab -->
+
+                      <!-- Upload.io tab -->
+                      <div class="tab-pane fade" id="tab-upload-io" role="tabpanel">
+                        <div class="col">
+                          <div class="row-md mb-2">
+                            <div class="card" id="uploadIoSettingsCard">
+                              <h5 class="card-header">Upload.io</h5>
+                              <div class="card-body pb-2">
+                                <form id="uploadIoSettingsForm">
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="row-md mb-0">
+                            <div class="card overflow-hidden">
+                              <div class="card-body">
+                                <button type="submit" form="uploadIoSettingsForm" class="btn btn-primary w-100">Save</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <!-- / Upload.io tab -->
+
 
                       <!-- HTTP tab -->
                       <div class="tab-pane fade" id="tab-http" role="tabpanel">
@@ -929,8 +961,8 @@
         integration_id: {
             type: 'list',
             title: 'Integration to use',
-            vals: ['Home Assistant', 'AWS S3', 'ThingsBoard', 'Generic HTTP', 'Generic MQTT', 'None'],
-            default: 5,
+            vals: ['Home Assistant', 'AWS S3', 'ThingsBoard', 'Upload.io', 'Generic HTTP', 'Generic MQTT', 'None'],
+            default: 6,
         }
     };
 
@@ -970,6 +1002,19 @@
             title: 'Enable persistent MQTT connection',
             default: true,
         }
+    };
+
+    const uploadIoSettingsSchema = {
+        auth_key: {
+            type: 'text',
+            title: 'API key',
+            default: '',
+        },
+        base_name: {
+            type: 'text',
+            title: 'Base name for uploaded files',
+            default: 'tokay',
+        },
     };
 
     function handlePlayStream() {
@@ -1319,12 +1364,26 @@
         $('#thingsboardSettingsCard').attr('style', 'max-height:710px;');
         new PerfectScrollbar('#thingsboardSettingsCard');
 
+        const postUploadIoSettings = function(formData) {
+            const message = {
+                "upload_io": formData
+            };
+            getSettingsSubmitCb('settings/integrations')(message);
+        };
+        generateSettingsForm(uploadIoSettingsSchema, 'UploadIoSettingsForm', null,
+                             '', postTBSettings);
+        $('#uploadIoSettingsCard').attr('style', 'max-height:710px;');
+        new PerfectScrollbar('#uploadIoSettingsCard');
+
         fetchSettings('integrations', function(resp) {
             if ('home_assistant' in resp) {
                 updateFormValues('homeAssistantSettingsForm', homeAssistantSettingsSchema, resp['home_assistant']);
             }
             if ('thingsboard' in resp) {
                 updateFormValues('thingsboardSettingsForm', thingsboardSettingsSchema, resp['thingsboard']);
+            }
+            if ('upload_io' in resp) {
+                updateFormValues('uploadIoSettingsForm', uploadIoSettingsSchema, resp['upload_io']);
             }
         });
 

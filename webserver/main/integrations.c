@@ -5,6 +5,7 @@
 
 #include "json_settings_helpers.h"
 #include "thingsboard.h"
+#include "upload_io.h"
 
 #define HA_HTTP_TIMEOUT_MS 3000
 #define TAG "integrations"
@@ -20,6 +21,7 @@ const char *integration_names[INTEGRATION_MAX] = {
     [INTEGRATION_HOME_ASSISTANT] = "home_assistant",
     [INTEGRATION_S3] = "s3",
     [INTEGRATION_THINGSBOARD] = "thingsboard",
+    [INTEGRATION_UPLOAD_IO] = "upload_io",
     [INTEGRATION_GENERIC_HTTP] = "http",
     [INTEGRATION_GENERIC_MQTT] = "mqtt",
 };
@@ -69,6 +71,8 @@ bool integrations_run(integration_t integration, const void *p_buf, size_t len)
         return home_assistant_upload_picture(p_cfg, p_buf, len);
     case INTEGRATION_THINGSBOARD:
         return thingsboard_upload_picture(p_cfg, p_buf, len);
+    case INTEGRATION_UPLOAD_IO:
+        return upload_io_upload_picture(p_cfg, p_buf, len);
     default:
         return false;
     }

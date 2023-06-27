@@ -183,7 +183,6 @@ static void app_task(void *pvArg)
         } else {
             pir_disable();
         }
-        /*
         if (low_power_mode) {
             ESP_LOGI(TAG, "Entering deep sleep");
             if (0 == sleep_duration_seconds) {
@@ -195,7 +194,6 @@ static void app_task(void *pvArg)
             vTaskDelay(pdMS_TO_TICKS(1000));
             esp_restart();
         }
-        */
     }
 
     motion_cooldown_timer = xTimerCreate("MOTION_CD", pdMS_TO_TICKS(MOTION_COOLDOWN_TIME_MS),
