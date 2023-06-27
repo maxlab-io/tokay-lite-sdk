@@ -61,10 +61,10 @@ bool upload_io_upload_picture(const cJSON *p_cfg, const void *p_buf, size_t len)
     char date_time_str[64];
     time_t t = time(NULL);
     struct tm *tm = localtime(&t);
-    strftime(date_time_str, sizeof(date_time_str), "%c", tm);
+    strftime(date_time_str, sizeof(date_time_str), "%Y-%m-%d-%H-%M-%S", tm);
     const char *p_base_name = json_settings_get_string_or(p_cfg, "base_name", "");
-    snprintf(upload_tags, sizeof(upload_tags), "[{\"name\":\"%s_" MACSTR "_%s\",\"searchable\":true}]",
-             p_base_name, MAC2STR(mac), date_time_str);
+    snprintf(upload_tags, sizeof(upload_tags), "[{\"name\":\"%s_%02x%02x%02x%02x%02x%02x_%s\",\"searchable\":true}]",
+             p_base_name, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], date_time_str);
     char auth[128];
     snprintf(auth, sizeof(auth), "Bearer %s", p_api_key);
     esp_http_client_set_method(http_client, HTTP_METHOD_POST);

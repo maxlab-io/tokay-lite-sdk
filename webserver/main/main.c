@@ -29,7 +29,7 @@
 #define TAG "main"
 
 #define EVENT_QUEUE_SIZE 5
-#define APP_TASK_STACK_SIZE 4096
+#define APP_TASK_STACK_SIZE (6 * 1024)
 #define APP_TASK_PRIORITY   5
 
 #define MOTION_COOLDOWN_TIME_MS 5000
