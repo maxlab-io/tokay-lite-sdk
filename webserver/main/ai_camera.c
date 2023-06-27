@@ -251,9 +251,6 @@ void ai_camera_stop(void)
 
 camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)
 {
-    if (camera_ctx.running) {
-        return NULL;
-    }
     if (!stop_camera_thread(timeout_ms)) {
         return NULL;
     }
