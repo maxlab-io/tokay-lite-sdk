@@ -120,7 +120,7 @@ bool auto_mode_run(void)
 
     const cJSON *p_integration_id = cJSON_GetObjectItem(p_settings, config_names[AUTO_MODE_CONFIG_INTEGRATION_ID]);
     bool ret = true;
-    if (NULL != p_integration_id) {
+    if (NULL != p_integration_id && p_integration_id->valueint != INTEGRATION_MAX) {
         if (!integrations_run(p_integration_id->valueint, bufs[0], lens[0])) {
             ret = false;
         }

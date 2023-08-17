@@ -60,7 +60,10 @@ void integrations_settings_set_json(const cJSON *p_cfg)
 
 bool integrations_run(integration_t integration, const void *p_buf, size_t len)
 {
-    assert(integration < INTEGRATION_MAX);
+    if (integration > INTEGRATION_MAX) {
+        ESP_LOGE(TAG, "Unknown integration %d", integration);
+        return false;
+    }
     const cJSON *p_cfg = cJSON_GetObjectItem(p_settings, integration_names[integration]);
     if (NULL == p_cfg) {
         ESP_LOGE(TAG, "Failed to run integration %d", integration);
