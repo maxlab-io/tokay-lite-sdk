@@ -231,6 +231,9 @@ void ai_camera_init(int i2c_bus_id)
 void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_frame_cb,
         ai_camera_meta_cb_t p_meta_cb, void *p_ctx)
 {
+    if (camera_ctx.running) {
+        return;
+    }
     camera_ctx.running = true;
     camera_ctx.pipeline = pipeline;
     camera_ctx.p_frame_cb = p_frame_cb;
@@ -242,6 +245,9 @@ void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_frame
 
 void ai_camera_stop(void)
 {
+    if (!camera_ctx.running) {
+        return;
+    }
     xEventGroupSetBits(camera_ctx.camera_thread_commands, (1 << CAMERA_CMD_STOP));
     xEventGroupWaitBits(camera_ctx.camera_thread_commands,
             (1 << CAMERA_CMD_RESP_STOP_DONE), pdTRUE, pdTRUE, portMAX_DELAY);

@@ -51,6 +51,7 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
 
 static void telemetry_timer_cb(TimerHandle_t handle);
 static void send_telemetry(void *arg);
+static void shutdown_stream(void *p_arg);
 
 extern const char index_html_start[] asm("_binary_index_themed_html_start");
 extern const char wifi_setup_html_start[] asm("_binary_wifi_setup_html_start");
@@ -434,7 +435,7 @@ static void camera_metadata_cb(cJSON *p_meta_root, void *p_ctx)
     char *p_response = cJSON_Print(p_meta_root);
     if (NULL == p_response) {
         ESP_LOGE(TAG, "Failed to generate frame meta JSON");
-        ai_camera_stop();
+        httpd_queue_work(app_httpd_ctx.http_server_handle, shutdown_stream, NULL);
         httpd_sess_trigger_close(app_httpd_ctx.http_server_handle, fd);
         return;
     }
@@ -447,9 +448,9 @@ static void camera_metadata_cb(cJSON *p_meta_root, void *p_ctx)
     free(p_response);
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
-        ai_camera_stop();
+        httpd_queue_work(app_httpd_ctx.http_server_handle, shutdown_stream, NULL);
         httpd_sess_trigger_close(app_httpd_ctx.http_server_handle, fd);
-        return;
+        ESP_LOGI(TAG, "HTTP session closed");
     }
 }
 
@@ -464,7 +465,13 @@ static void camera_frame_cb(pixformat_t format, const uint8_t *p_data, uint32_t 
     esp_err_t ret = httpd_ws_send_frame_async(app_httpd_ctx.http_server_handle, fd, &ws_pkt);
     if (ESP_OK != ret) {
         ESP_LOGE(TAG, "Failed to send WS frame: %d", ret);
-        ai_camera_stop();
+        httpd_queue_work(app_httpd_ctx.http_server_handle, shutdown_stream, NULL);
         httpd_sess_trigger_close(app_httpd_ctx.http_server_handle, fd);
+        ESP_LOGI(TAG, "HTTP session closed");
     }
+}
+
+static void shutdown_stream(void *p_arg)
+{
+    ai_camera_stop();
 }
