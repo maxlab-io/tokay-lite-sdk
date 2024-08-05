@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "leds.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -234,6 +235,10 @@ void ai_camera_start(ai_camera_pipeline_t pipeline, ai_camera_frame_cb_t p_frame
     if (camera_ctx.running) {
         return;
     }
+
+    // TODO: better place for it?
+    leds_status_set(LEDS_STATUS_STREAMING);
+
     camera_ctx.running = true;
     camera_ctx.pipeline = pipeline;
     camera_ctx.p_frame_cb = p_frame_cb;
@@ -253,6 +258,8 @@ void ai_camera_stop(void)
             (1 << CAMERA_CMD_RESP_STOP_DONE), pdTRUE, pdTRUE, portMAX_DELAY);
     xTimerStop(camera_ctx.ir_mode_timer, portMAX_DELAY); // not reliable, but good for now
     camera_ctx.running = false;
+    // TODO: better place for it?
+    leds_status_set(LEDS_STATUS_STANDBY);
 }
 
 camera_fb_t *ai_camera_get_frame(pixformat_t format, TickType_t timeout_ms)

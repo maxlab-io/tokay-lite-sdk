@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "esp_camera.h"
+#include "leds.h"
 #include "sensor.h"
 
 #include "cJSON.h"
@@ -51,6 +52,8 @@ void app_main(void)
     gpio_install_isr_service(0);
     bsp_init(button_callback);
     pir_init(pir_motion_callback, NULL);
+    leds_status_set(LEDS_STATUS_INITIAL);
+
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -207,6 +210,7 @@ static void app_task(void *pvArg)
             if (!app_httpd_is_running()) {
                 app_httpd_start(false);
             }
+            leds_status_set(LEDS_STATUS_STANDBY);
             break;
         case APP_EVENT_PIR_MOTION_DETECTED:
             xTimerReset(motion_cooldown_timer, portMAX_DELAY);

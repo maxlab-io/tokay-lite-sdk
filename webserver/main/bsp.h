@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #define BSP_I2C_BUS_ID    0
+#define STATUS_LED_PIN    42
 
 void bsp_init(void (*usr_button_cb)(void));
 uint32_t bsp_read_vbat(void);

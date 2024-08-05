@@ -15,6 +15,7 @@
 
 #include "ext_rtc.h"
 
+#include "leds.h"
 #include "light_sensor.h"
 
 #define BATT_DETECT_ADC_CHANNEL  ADC_CHANNEL_0 // GPIO1
@@ -87,6 +88,8 @@ void bsp_init(void (*usr_button_cb)(void))
     if (!light_sensor_init(BSP_I2C_BUS_ID)) {
         ESP_LOGE(TAG, "Failed to initialize ALS");
     }
+
+    leds_init();
 }
 
 uint32_t bsp_read_vbat(void)
