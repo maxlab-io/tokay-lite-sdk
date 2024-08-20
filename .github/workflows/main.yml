@@ -1,0 +1,15 @@
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    - release/*
+
+jobs:
+  build_fw:
+    runs-on: ubuntu-latest
+    container: 
+      image: idf:v5.3
+    steps:
+      - name: "Hello world!"
+        run: echo "hello world!"
