@@ -1,7 +1,7 @@
 [submodule "external/esp32-camera"]
 	path = external/esp32-camera
-	url = https://github.com/RostakaGmfun/esp32-camera.git
-	branch = gmfun
+	url = git@github.com:maxlab-io/esp32-camera.git 
+	branch = maxlab_branch
 [submodule "external/tflite-micro-esp-examples"]
 	path = external/tflite-micro-esp-examples
 	url = https://github.com/espressif/tflite-micro-esp-examples.git

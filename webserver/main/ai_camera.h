@@ -7,7 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "cJSON.h"
 
-#include "config.h"
+#include "sdkconfig.h"
 
 #define AI_CAMERA_IR_THRESH_LOW_DEFAULT  10
 #define AI_CAMERA_IR_THRESH_HIGH_DEFAULT 40

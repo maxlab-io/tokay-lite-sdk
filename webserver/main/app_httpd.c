@@ -9,7 +9,7 @@
 #include "main.h"
 #include "bsp.h"
 #include "pir.h"
-#include "config.h"
+#include "sdkconfig.h"
 #include "ai_camera.h"
 #include "auto_mode.h"
 #include "integrations.h"

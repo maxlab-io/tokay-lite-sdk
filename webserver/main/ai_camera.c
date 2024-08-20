@@ -14,7 +14,7 @@
 #include "driver/ledc.h"
 #include "driver/gpio.h"
 
-#include "config.h"
+#include "sdkconfig.h"
 #include "light_sensor.h"
 #include "ai_pipeline.h"
 #include "json_settings_helpers.h"

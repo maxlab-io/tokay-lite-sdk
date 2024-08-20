@@ -1,5 +1,7 @@
 #include "ai_pipeline.h"
 
+#include "esp_heap_caps.h"
+#include "multi_heap.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
@@ -70,15 +72,15 @@ extern "C" {
 
 void ai_pipeline_init(void)
 {
-    tensor_arena = (uint8_t *) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
+    tensor_arena = (uint8_t *) heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
     if (tensor_arena == NULL) {
-        ESP_LOGE(TAG, "Couldn't allocate memory of %d bytes\n", kTensorArenaSize);
+        ESP_LOGE(TAG, "Couldn't allocate arena memory of %d bytes", kTensorArenaSize);
         return;
     }
 
     p_input = (uint8_t *) heap_caps_malloc(INPUT_MAX_SIZE, MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
     if (p_input == NULL) {
-        ESP_LOGE(TAG, "Couldn't allocate memory of %d bytes\n", INPUT_MAX_SIZE);
+        ESP_LOGE(TAG, "Couldn't allocate input memory of %d bytes", INPUT_MAX_SIZE);
         return;
     }
 
