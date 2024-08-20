@@ -7,4 +7,4 @@ echo "IDF_PATH: $IDF_PATH"
 echo "PATH: $PATH"
 
 . "${IDF_PATH}/export.sh"
-idf.py build
+idf.py -C webserver build
