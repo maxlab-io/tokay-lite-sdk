@@ -14,5 +14,7 @@ jobs:
     steps:
       - name: "Checkout files"
         uses: actions/checkout@v4
+        with:
+          submodules: "true"
       - name: "Regular firmware build"
         run: "./ci/build.sh"
