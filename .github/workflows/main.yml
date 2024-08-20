@@ -2,14 +2,19 @@ on:
   workflow_dispatch:
   push:
     branches:
-    - main
-    - release/*
+      - main
+      - release/*
+      - workflow/*
 
 jobs:
   build_fw:
     runs-on: ubuntu-latest
-    container: 
-      image: idf:v5.3
+    container:
+      image: espressif/idf:v5.3
     steps:
-      - name: "Hello world!"
-        run: echo "hello world!"
+      - name: "Checkout files"
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+      - name: "Regular firmware build"
+        run: "./ci/build.sh"
