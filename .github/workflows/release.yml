@@ -1,0 +1,22 @@
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release_fw:
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v5.3
+    steps:
+      - name: "Checkout files"
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+      - name: "Regular firmware build"
+        run: "./ci/build.sh"
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: webserver/build/tokay_lite.bin
